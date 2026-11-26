@@ -392,11 +392,29 @@ $("loadStudentStats").onclick = async () => {
   }
 };
 
+function getWeekNumber(weekName) {
+  const m = String(weekName || "").match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function filterBySemester(detail, semester) {
+  if (semester === "1") return detail.filter(d => {
+    const n = getWeekNumber(d.weekName);
+    return n >= 1 && n <= 18;
+  });
+  if (semester === "2") return detail.filter(d => {
+    const n = getWeekNumber(d.weekName);
+    return n >= 19 && n <= 35;
+  });
+  return detail;
+}
+
 async function showStudentDetail(studentId, studentInfo) {
   try {
+    const semester = $("statsStudentSemester") ? $("statsStudentSemester").value : "";
     const r = await api("studentStats", {
       studentId,
-      semester: $("statsStudentSemester") ? $("statsStudentSemester").value : ""
+      semester
     });
 
     // Lọc theo môn nếu có
@@ -406,6 +424,8 @@ async function showStudentDetail(studentId, studentInfo) {
       const subName = meta.subjects.find(s => s.id === subjectFilter)?.name;
       detail = detail.filter(d => d.subjectName === subName);
     }
+    // Lọc lại theo học kỳ ở client (đảm bảo không lẫn tuần HK khác)
+    detail = filterBySemester(detail, semester);
 
     $("studentListBox").style.display = "none";
     $("studentStatsInfo").style.display = "block";
