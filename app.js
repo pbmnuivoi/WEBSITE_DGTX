@@ -259,13 +259,14 @@ async function saveRating(student, value) {
 }
 
 // ==================== THỐNG KÊ ====================
-// Top 1-10 lớp
+// Top 1-10 (lớp hoặc học sinh tùy chọn)
 $("loadClassRank").onclick = async () => {
   try {
+    const classId = $("statsClassFilter").value;
     const r = await api("stats", {
       weekId: $("statsWeek").value,
       subjectId: $("statsSubject").value,
-      classId: $("statsClassFilter").value
+      classId
     });
 
     $("classRankSummary").innerHTML = "";
@@ -283,15 +284,47 @@ $("loadClassRank").onclick = async () => {
 
     const body = $("rankBody");
     body.innerHTML = "";
-    (r.ranking || []).slice(0, 10).forEach((x, i) => {
-      const tr = document.createElement("tr");
-      [i + 1, x.className, x.good, x.complete, x.notYet, x.goodRate + "%"].forEach(v => {
-        const td = document.createElement("td");
-        td.textContent = v;
-        tr.append(td);
+
+    // Cập nhật tiêu đề cột theo mode
+    const thead = body.closest("table").querySelector("thead tr");
+    if (r.mode === "student") {
+      thead.innerHTML = `
+        <th>Hạng</th>
+        <th>Học sinh</th>
+        <th>Mã HS</th>
+        <th>Tốt</th>
+        <th>Hoàn thành</th>
+        <th>Cần cố gắng</th>
+        <th>Tỷ lệ Tốt</th>`;
+      (r.ranking || []).slice(0, 10).forEach((x, i) => {
+        const tr = document.createElement("tr");
+        [i + 1, x.studentName, x.studentCode || "", x.good, x.complete, x.notYet, x.goodRate + "%"]
+          .forEach(v => {
+            const td = document.createElement("td");
+            td.textContent = v;
+            tr.append(td);
+          });
+        body.append(tr);
       });
-      body.append(tr);
-    });
+    } else {
+      thead.innerHTML = `
+        <th>Hạng</th>
+        <th>Lớp</th>
+        <th>Tốt</th>
+        <th>Hoàn thành</th>
+        <th>Cần cố gắng</th>
+        <th>Tỷ lệ Tốt</th>`;
+      (r.ranking || []).slice(0, 10).forEach((x, i) => {
+        const tr = document.createElement("tr");
+        [i + 1, x.className, x.good, x.complete, x.notYet, x.goodRate + "%"]
+          .forEach(v => {
+            const td = document.createElement("td");
+            td.textContent = v;
+            tr.append(td);
+          });
+        body.append(tr);
+      });
+    }
   } catch (e) {
     toast(e.message);
   }
