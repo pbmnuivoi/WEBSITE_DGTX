@@ -91,6 +91,13 @@
       <div class="card">
         <h2>Top 1–10 lớp</h2>
         <div class="toolbar" style="margin-bottom:14px">
+          <label>Học kỳ
+            <select id="statsSemester">
+              <option value="">Cả năm</option>
+              <option value="1">Học kỳ 1 (Tuần 1–18)</option>
+              <option value="2">Học kỳ 2 (Tuần 19–35)</option>
+            </select>
+          </label>
           <label>Tuần
             <select id="statsWeek"></select>
           </label>
@@ -246,6 +253,34 @@
             </thead>
             <tbody id="studentManageList"></tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="section-title">Xóa dữ liệu đánh giá</div>
+      <div class="card">
+        <p style="color:#64748b;font-size:13px;margin-bottom:12px">
+          Xóa hàng loạt dữ liệu đánh giá theo lớp / học kỳ / môn.<br>
+          <strong style="color:#b91c1c">Hành động này không thể hoàn tác.</strong>
+        </p>
+        <div class="toolbar">
+          <label>Lớp
+            <select id="clearClass">
+              <option value="">Tất cả lớp</option>
+            </select>
+          </label>
+          <label>Học kỳ
+            <select id="clearSemester">
+              <option value="">Cả năm</option>
+              <option value="1">Học kỳ 1 (Tuần 1–18)</option>
+              <option value="2">Học kỳ 2 (Tuần 19–35)</option>
+            </select>
+          </label>
+          <label>Môn học
+            <select id="clearSubject">
+              <option value="">Tất cả môn</option>
+            </select>
+          </label>
+          <button id="btnClearAssessments" class="primary" style="background:#b91c1c">Xóa dữ liệu đánh giá</button>
         </div>
       </div>
     </section>
