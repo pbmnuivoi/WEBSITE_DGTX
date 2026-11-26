@@ -4,10 +4,9 @@ let token="",me=null,meta={classes:[],subjects:[],weeks:[]},students=[],assessme
 const rating=[{v:"TOT",i:"★",t:"Tốt"},{v:"HT",i:"✿",t:"Hoàn thành"},{v:"CĐ",i:"ϟ",t:"Chưa đạt"}];
 function toast(s){let e=$("toast");e.textContent=s;e.classList.add("show");setTimeout(()=>e.classList.remove("show"),2500)}
 
+
 async function api(action, data = {}) {
-  if (!API) {
-    throw Error("Chưa cấu hình API_URL");
-  }
+  if (!API) throw Error("Chưa cấu hình API_URL");
 
   let response;
 
@@ -29,11 +28,9 @@ async function api(action, data = {}) {
 
   const raw = await response.text();
 
-  if (!raw || !raw.trim()) {
+  if (!raw.trim()) {
     throw Error(
-      "API trả về dữ liệu rỗng. HTTP: " +
-      response.status +
-      ". Kiểm tra Netlify Functions."
+      "API trả về dữ liệu rỗng. HTTP " + response.status
     );
   }
 
@@ -41,20 +38,14 @@ async function api(action, data = {}) {
 
   try {
     result = JSON.parse(raw);
-  } catch (e) {
+  } catch {
     throw Error(
-      "API không trả về JSON hợp lệ. HTTP: " +
-      response.status +
-      ". Nội dung: " + raw.substring(0, 300)
+      "API không trả JSON hợp lệ: " + raw.substring(0, 300)
     );
   }
 
   if (!response.ok || !result.ok) {
-    throw Error(
-      result.error ||
-      result.message ||
-      "API lỗi HTTP " + response.status
-    );
+    throw Error(result.error || "API lỗi HTTP " + response.status);
   }
 
   return result;
