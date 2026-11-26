@@ -3,7 +3,63 @@ const API=window.APP_CONFIG?.API_URL||"";
 let token="",me=null,meta={classes:[],subjects:[],weeks:[]},students=[],assessments={};
 const rating=[{v:"TOT",i:"★",t:"Tốt"},{v:"HT",i:"✿",t:"Hoàn thành"},{v:"CĐ",i:"ϟ",t:"Chưa đạt"}];
 function toast(s){let e=$("toast");e.textContent=s;e.classList.add("show");setTimeout(()=>e.classList.remove("show"),2500)}
-async function api(action,data={}){if(!API)throw Error("Chưa cấu hình API_URL trong app.js");let r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,token,...data})});let j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||"Lỗi kết nối");return j}
+
+async function api(action, data = {}) {
+  if (!API) {
+    throw Error("Chưa cấu hình API_URL");
+  }
+
+  let response;
+
+  try {
+    response = await fetch(API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action,
+        token,
+        ...data
+      })
+    });
+  } catch (e) {
+    throw Error("Không kết nối được API: " + e.message);
+  }
+
+  const raw = await response.text();
+
+  if (!raw || !raw.trim()) {
+    throw Error(
+      "API trả về dữ liệu rỗng. HTTP: " +
+      response.status +
+      ". Kiểm tra Netlify Functions."
+    );
+  }
+
+  let result;
+
+  try {
+    result = JSON.parse(raw);
+  } catch (e) {
+    throw Error(
+      "API không trả về JSON hợp lệ. HTTP: " +
+      response.status +
+      ". Nội dung: " + raw.substring(0, 300)
+    );
+  }
+
+  if (!response.ok || !result.ok) {
+    throw Error(
+      result.error ||
+      result.message ||
+      "API lỗi HTTP " + response.status
+    );
+  }
+
+  return result;
+}
+
 $("loginForm").onsubmit=async e=>{e.preventDefault();$("loginMsg").textContent="Đang đăng nhập...";try{let r=await api("login",{username:$("username").value.trim(),password:$("password").value});token=r.token;me=r.user;localStorage.setItem("dgt_token",token);await enter()}catch(x){$("loginMsg").textContent=x.message}};
 async function enter(){let r=await api("init");meta=r.meta; $("loginView").hidden=true;$("appView").hidden=false;$("userLabel").textContent=me?.displayName||me?.username||"";document.querySelectorAll(".admin-only").forEach(x=>x.hidden=me?.role!=="admin");fillSelects();await loadStudents();showTab("evaluate")}
 $("logoutBtn").onclick=()=>{token="";me=null;localStorage.removeItem("dgt_token");$("appView").hidden=true;$("loginView").hidden=false};
