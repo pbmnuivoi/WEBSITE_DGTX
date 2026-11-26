@@ -128,6 +128,8 @@ function fillSelects() {
 
   fill("uploadClass", meta.classes, "Chọn lớp");
   fill("manageStudentClass", meta.classes, "Chọn lớp");
+  fill("clearClass", meta.classes, "Tất cả lớp");
+  fill("clearSubject", meta.subjects, "Tất cả môn");
 
   // Khôi phục lựa chọn tuần/môn đã lưu
   const w = localStorage.getItem("dgt_week");
@@ -238,9 +240,16 @@ function renderStudents() {
 async function saveRating(student, value) {
   const key = student.id;
   const old = assessments[key];
-  assessments[key] = value;
+  // Bấm lại mức đang chọn → bỏ chọn (xóa đánh giá)
+  const isClear = old === value;
+  const newValue = isClear ? "" : value;
+
+  if (isClear) delete assessments[key];
+  else assessments[key] = newValue;
   renderStudents();
-  $("saveStatus").textContent = `Đang lưu ${student.name}...`;
+  $("saveStatus").textContent = isClear
+    ? `Đang xóa đánh giá ${student.name}...`
+    : `Đang lưu ${student.name}...`;
 
   try {
     await api("saveAssessment", {
@@ -248,11 +257,14 @@ async function saveRating(student, value) {
       classId: $("classSelect").value,
       weekId: $("weekSelect").value,
       subjectId: $("subjectSelect").value,
-      value
+      value: isClear ? "CLEAR" : newValue
     });
-    $("saveStatus").textContent = `Đã lưu: ${student.name} · ${rating.find(x => x.v === value).t}`;
+    $("saveStatus").textContent = isClear
+      ? `Đã xóa đánh giá: ${student.name}`
+      : `Đã lưu: ${student.name} · ${rating.find(x => x.v === newValue).t}`;
   } catch (e) {
-    assessments[key] = old;
+    if (isClear) assessments[key] = old;
+    else assessments[key] = old;
     renderStudents();
     $("saveStatus").textContent = "Lỗi: " + e.message;
   }
@@ -266,7 +278,8 @@ $("loadClassRank").onclick = async () => {
     const r = await api("stats", {
       weekId: $("statsWeek").value,
       subjectId: $("statsSubject").value,
-      classId
+      classId,
+      semester: $("statsSemester") ? $("statsSemester").value : ""
     });
 
     $("classRankSummary").innerHTML = "";
@@ -680,6 +693,51 @@ $("uploadForm").onsubmit = async e => {
     setLoading(btn, false);
   }
 };
+
+
+// ==================== XÓA DỮ LIỆU ĐÁNH GIÁ ====================
+async function clearAssessmentsData() {
+  const classId = $("clearClass")?.value || "";
+  const semester = $("clearSemester")?.value || "";
+  const subjectId = $("clearSubject")?.value || "";
+
+  let msg = "Bạn có chắc muốn XÓA dữ liệu đánh giá";
+  if (classId) {
+    const c = meta.classes.find(x => x.id === classId);
+    msg += ` của lớp ${c ? c.name : ""}`;
+  }
+  if (semester === "1") msg += " – Học kỳ 1 (Tuần 1-18)";
+  else if (semester === "2") msg += " – Học kỳ 2 (Tuần 19-35)";
+  if (subjectId) {
+    const s = meta.subjects.find(x => x.id === subjectId);
+    msg += ` – môn ${s ? s.name : ""}`;
+  }
+  msg += "?\n\nHành động này KHÔNG thể hoàn tác!";
+
+  if (!confirm(msg)) return;
+
+  const btn = $("btnClearAssessments");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Đang xóa...";
+  }
+  try {
+    const r = await api("clearAssessments", { classId, semester, subjectId });
+    toast(`Đã xóa ${r.deleted} bản ghi đánh giá`);
+    $("manageMsg").textContent = `Đã xóa ${r.deleted} bản ghi đánh giá`;
+  } catch (e) {
+    toast(e.message);
+    $("manageMsg").textContent = e.message;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Xóa dữ liệu đánh giá";
+    }
+  }
+}
+if ($("btnClearAssessments")) {
+  $("btnClearAssessments").onclick = clearAssessmentsData;
+}
 
 // ==================== AUTO LOGIN ====================
 (async () => {
