@@ -11,7 +11,7 @@
 
 <!-- LOGIN -->
 <div id="loginView" class="login-wrap">
-  <form id="loginForm" class="login card">
+  <form id="loginForm" class="login">
     <div class="brand">✦</div>
     <h1>Đánh giá thường xuyên</h1>
     <p>Hệ thống quản lý đánh giá học sinh</p>
@@ -43,12 +43,9 @@
   </nav>
 
   <main>
-    <!-- TAB ĐÁNH GIÁ -->
+    <!-- ==================== TAB ĐÁNH GIÁ (BẢNG MA TRẬN) ==================== -->
     <section id="evaluate" class="panel">
       <div class="toolbar card">
-        <label>Tuần
-          <select id="weekSelect"></select>
-        </label>
         <label>Môn học
           <select id="subjectSelect"></select>
         </label>
@@ -56,59 +53,107 @@
           <select id="classSelect"></select>
         </label>
         <label class="search">Tìm học sinh
-          <input id="studentSearch" placeholder="Nhập họ tên học sinh...">
+          <input id="studentSearch" placeholder="Nhập họ tên...">
         </label>
+        <button id="reloadEval" class="ghost">Làm mới</button>
       </div>
 
       <div class="legend">
         <span>★ Tốt</span>
         <span>✿ Hoàn thành</span>
         <span>ϟ Cần cố gắng</span>
-        <span class="muted">Bấm biểu tượng để lưu / chỉnh sửa đánh giá</span>
+        <span class="muted">Bấm vào ô để thay đổi đánh giá</span>
       </div>
 
-      <div id="studentList" class="student-list card">
-        <div class="empty">Chọn lớp để hiển thị học sinh</div>
-      </div>
-      <div id="saveStatus" class="save-status" aria-live="polite"></div>
-    </section>
-
-    <!-- TAB THỐNG KÊ (theo học sinh) -->
-    <section id="stats" class="panel" hidden>
-      <div class="toolbar card">
-        <label>Lớp
-          <select id="statsClass"></select>
-        </label>
-        <label>Học sinh
-          <select id="statsStudent">
-            <option value="">-- Chọn học sinh --</option>
-          </select>
-        </label>
-        <button id="loadStudentStats" class="primary">Xem thống kê</button>
-      </div>
-
-      <div id="studentStatsInfo" class="card" style="display:none; margin-top:16px">
-        <h2 id="statsStudentName"></h2>
-        <div class="stats-grid" id="statsSummary"></div>
-      </div>
-
-      <div class="card table-wrap" style="margin-top:16px">
-        <h2>Chi tiết theo tuần</h2>
-        <table>
+      <div class="table-wrap">
+        <table class="eval-table" id="evalTable">
           <thead>
-            <tr>
-              <th>Tuần</th>
-              <th>Môn học</th>
-              <th>Đánh giá</th>
-              <th>Thời gian cập nhật</th>
+            <tr id="evalHeader">
+              <th class="student-col">Học sinh</th>
+              <!-- các cột tuần sẽ được render bằng JS -->
             </tr>
           </thead>
-          <tbody id="statsDetailBody"></tbody>
+          <tbody id="evalBody">
+            <tr><td colspan="20" class="empty">Chọn lớp và môn học để hiển thị bảng đánh giá</td></tr>
+          </tbody>
         </table>
+      </div>
+      <div id="saveStatus" class="save-status"></div>
+    </section>
+
+    <!-- ==================== TAB THỐNG KÊ ==================== -->
+    <section id="stats" class="panel" hidden>
+      <!-- Phần Top lớp -->
+      <div class="card">
+        <h2>Top 1–10 lớp</h2>
+        <div class="toolbar" style="margin-bottom:14px">
+          <label>Tuần
+            <select id="statsWeek"></select>
+          </label>
+          <label>Môn học
+            <select id="statsSubject"></select>
+          </label>
+          <button id="loadClassRank" class="primary">Xem xếp hạng</button>
+        </div>
+        <div id="classRankSummary" class="stats-grid"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Hạng</th>
+                <th>Lớp</th>
+                <th>Tốt</th>
+                <th>Hoàn thành</th>
+                <th>Cần cố gắng</th>
+                <th>Tỷ lệ Tốt</th>
+              </tr>
+            </thead>
+            <tbody id="rankBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Phần thống kê 1 học sinh -->
+      <div class="card" style="margin-top:20px">
+        <h2>Thống kê theo học sinh</h2>
+        <div class="toolbar" style="margin-bottom:14px">
+          <label>Lớp
+            <select id="statsClass"></select>
+          </label>
+          <label>Môn học
+            <select id="statsStudentSubject"></select>
+          </label>
+          <label>Học sinh
+            <select id="statsStudent">
+              <option value="">-- Chọn học sinh --</option>
+            </select>
+          </label>
+          <button id="loadStudentStats" class="primary">Xem chi tiết</button>
+        </div>
+
+        <div id="studentStatsInfo" style="display:none">
+          <h3 id="statsStudentName" style="margin-bottom:12px;font-size:16px"></h3>
+          <div class="stats-grid" id="statsSummary"></div>
+
+          <div class="table-wrap" style="margin-top:12px">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tuần</th>
+                  <th>Môn học</th>
+                  <th>Đánh giá</th>
+                  <th>Thời gian</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="statsDetailBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- TAB QUẢN LÝ -->
+    <!-- ==================== TAB QUẢN LÝ ==================== -->
     <section id="manage" class="panel" hidden>
       <div class="manage-grid">
         <form id="classForm" class="card">
@@ -116,59 +161,69 @@
           <input name="name" placeholder="Ví dụ: 5D" required>
           <button class="primary">Thêm lớp</button>
         </form>
-
         <form id="subjectForm" class="card">
           <h2>Thêm môn học</h2>
           <input name="name" placeholder="Ví dụ: Tin học" required>
           <button class="primary">Thêm môn</button>
         </form>
-
         <form id="weekForm" class="card">
           <h2>Thêm tuần</h2>
           <input name="name" placeholder="Ví dụ: Tuần 12" required>
           <button class="primary">Thêm tuần</button>
         </form>
-
         <form id="uploadForm" class="card">
           <h2>Nạp danh sách học sinh</h2>
           <label>Lớp nhận danh sách
             <select id="uploadClass" required></select>
           </label>
           <input id="studentFile" type="file" accept=".xlsx,.xls,.csv" required>
-          <p class="hint">Hỗ trợ file Excel gốc của trường (.xls/.xlsx)</p>
+          <p class="hint" style="font-size:12.5px;color:#64748b">Hỗ trợ file Excel gốc của trường</p>
           <button class="primary">Nạp học sinh</button>
         </form>
       </div>
-
       <div id="manageMsg" class="message"></div>
 
-      <div class="manage-lists">
-        <div class="card">
-          <h2>Danh sách lớp</h2>
-          <div id="classList" class="list-box"></div>
-        </div>
-        <div class="card">
-          <h2>Danh sách môn học</h2>
-          <div id="subjectList" class="list-box"></div>
-        </div>
-        <div class="card">
-          <h2>Danh sách tuần</h2>
-          <div id="weekList" class="list-box"></div>
-        </div>
+      <div class="section-title">Danh sách lớp</div>
+      <div class="table-wrap card" style="padding:0">
+        <table>
+          <thead><tr><th>Tên lớp</th><th style="width:140px">Thao tác</th></tr></thead>
+          <tbody id="classList"></tbody>
+        </table>
       </div>
 
-      <div class="card" style="margin-top:20px">
-        <h2>Quản lý học sinh theo lớp</h2>
-        <label>Chọn lớp
+      <div class="section-title">Danh sách môn học</div>
+      <div class="table-wrap card" style="padding:0">
+        <table>
+          <thead><tr><th>Tên môn</th><th style="width:140px">Thao tác</th></tr></thead>
+          <tbody id="subjectList"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Danh sách tuần</div>
+      <div class="table-wrap card" style="padding:0">
+        <table>
+          <thead><tr><th>Tên tuần</th><th style="width:140px">Thao tác</th></tr></thead>
+          <tbody id="weekList"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Quản lý học sinh theo lớp</div>
+      <div class="card">
+        <label style="max-width:280px;margin-bottom:12px">Chọn lớp
           <select id="manageStudentClass"></select>
         </label>
-        <div id="studentManageList" class="list-box" style="margin-top:12px"></div>
-      </div>
-
-      <div class="card" style="margin-top:16px">
-        <h2>Tài khoản đăng nhập</h2>
-        <p>Tạo tài khoản trong tab <b>Users</b> của Google Sheet: username, password, displayName, role, active.<br>
-        Vai trò: <code>admin</code> hoặc <code>teacher</code>.</p>
+        <div class="table-wrap" style="padding:0">
+          <table>
+            <thead>
+              <tr>
+                <th>Họ và tên</th>
+                <th>Mã HS</th>
+                <th style="width:140px">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="studentManageList"></tbody>
+          </table>
+        </div>
       </div>
     </section>
   </main>
