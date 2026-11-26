@@ -1,51 +1,184 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Đánh giá thường xuyên</title>
-<link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đánh giá thường xuyên</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
+
+<!-- LOGIN -->
 <div id="loginView" class="login-wrap">
   <form id="loginForm" class="login card">
-    <div class="brand">✦</div><h1>Đánh giá thường xuyên</h1><p>Hệ thống quản lý đánh giá học sinh</p>
-    <label>Tài khoản<input id="username" autocomplete="username" required></label>
-    <label>Mật khẩu<input id="password" type="password" autocomplete="current-password" required></label>
-    <button class="primary">Đăng nhập</button><div id="loginMsg" class="message"></div>
+    <div class="brand">✦</div>
+    <h1>Đánh giá thường xuyên</h1>
+    <p>Hệ thống quản lý đánh giá học sinh</p>
+    <label>Tài khoản
+      <input id="username" autocomplete="username" required>
+    </label>
+    <label>Mật khẩu
+      <input id="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button class="primary">Đăng nhập</button>
+    <div id="loginMsg" class="message"></div>
   </form>
 </div>
+
+<!-- APP -->
 <div id="appView" hidden>
-<header><div><b>✦ Đánh giá thường xuyên</b><small id="userLabel"></small></div><button id="logoutBtn" class="ghost">Đăng xuất</button></header>
-<nav class="tabs"><button class="tab active" data-tab="evaluate">Đánh giá</button><button class="tab" data-tab="stats">Thống kê</button><button class="tab admin-only" data-tab="manage">Quản lý dữ liệu</button></nav>
-<main>
-<section id="evaluate" class="panel">
- <div class="toolbar card">
-  <label>Tuần<select id="weekSelect"></select></label>
-  <label>Môn học<select id="subjectSelect"></select></label>
-  <label>Lớp<select id="classSelect"></select></label>
-  <label class="search">Tìm học sinh<input id="studentSearch" placeholder="Nhập họ tên học sinh..."></label>
- </div>
- <div class="legend"><span>★ Tốt</span><span>✿ Hoàn thành</span><span>ϟ Chưa đạt</span><span class="muted">Bấm biểu tượng để lưu tự động</span></div>
- <div id="studentList" class="student-list card"><div class="empty">Chọn lớp để hiển thị học sinh</div></div>
- <div id="saveStatus" class="save-status" aria-live="polite"></div>
-</section>
-<section id="stats" class="panel" hidden>
- <div class="toolbar card"><label>Tuần<select id="statsWeek"></select></label><label>Môn học<select id="statsSubject"></select></label><label>Lớp<select id="statsClass"><option value="">Tất cả lớp</option></select></label><button id="loadStats" class="primary">Xem thống kê</button></div>
- <div id="statsSummary" class="stats-grid"></div><div class="card table-wrap"><h2>Top 1–10 lớp</h2><table><thead><tr><th>Hạng</th><th>Lớp</th><th>Tốt</th><th>Hoàn thành</th><th>Chưa đạt</th><th>Tỷ lệ Tốt</th></tr></thead><tbody id="rankBody"></tbody></table></div>
-</section>
-<section id="manage" class="panel" hidden>
- <div class="manage-grid">
-  <form id="classForm" class="card"><h2>Thêm lớp</h2><input name="name" placeholder="Ví dụ: 5D" required><button class="primary">Thêm lớp</button></form>
-  <form id="subjectForm" class="card"><h2>Thêm môn học</h2><input name="name" placeholder="Ví dụ: Tin học" required><button class="primary">Thêm môn</button></form>
-  <form id="weekForm" class="card"><h2>Thêm tuần</h2><input name="name" placeholder="Ví dụ: Tuần 12" required><button class="primary">Thêm tuần</button></form>
-  <form id="uploadForm" class="card"><h2>Nạp danh sách học sinh</h2><label>Lớp nhận danh sách<select id="uploadClass" required></select></label><input id="studentFile" type="file" accept=".xlsx,.xls,.csv" required><p class="hint">Dùng trực tiếp file Excel gốc của trường (.xls/.xlsx): tự nhận diện dòng tiêu đề, đọc STT, Mã học sinh và ghép Họ và tên từ hai cột; không cần chỉnh sửa file.</p><button class="primary">Nạp học sinh</button></form>
- </div><div id="manageMsg" class="message"></div>
- <div class="card"><h2>Tài khoản đăng nhập</h2><p>Tạo tài khoản trong tab <b>Users</b> của Google Sheet: username, password, displayName, role, active. Vai trò admin hoặc teacher.</p></div>
-</section>
-</main>
-<footer>Đánh giá thường xuyên · Dữ liệu lưu trên Google Sheets</footer>
+  <header>
+    <div>
+      <b>✦ Đánh giá thường xuyên</b>
+      <small id="userLabel"></small>
+    </div>
+    <button id="logoutBtn" class="ghost">Đăng xuất</button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="evaluate">Đánh giá</button>
+    <button class="tab" data-tab="stats">Thống kê</button>
+    <button class="tab admin-only" data-tab="manage">Quản lý dữ liệu</button>
+  </nav>
+
+  <main>
+    <!-- TAB ĐÁNH GIÁ -->
+    <section id="evaluate" class="panel">
+      <div class="toolbar card">
+        <label>Tuần
+          <select id="weekSelect"></select>
+        </label>
+        <label>Môn học
+          <select id="subjectSelect"></select>
+        </label>
+        <label>Lớp
+          <select id="classSelect"></select>
+        </label>
+        <label class="search">Tìm học sinh
+          <input id="studentSearch" placeholder="Nhập họ tên học sinh...">
+        </label>
+      </div>
+
+      <div class="legend">
+        <span>★ Tốt</span>
+        <span>✿ Hoàn thành</span>
+        <span>ϟ Cần cố gắng</span>
+        <span class="muted">Bấm biểu tượng để lưu / chỉnh sửa đánh giá</span>
+      </div>
+
+      <div id="studentList" class="student-list card">
+        <div class="empty">Chọn lớp để hiển thị học sinh</div>
+      </div>
+      <div id="saveStatus" class="save-status" aria-live="polite"></div>
+    </section>
+
+    <!-- TAB THỐNG KÊ (theo học sinh) -->
+    <section id="stats" class="panel" hidden>
+      <div class="toolbar card">
+        <label>Lớp
+          <select id="statsClass"></select>
+        </label>
+        <label>Học sinh
+          <select id="statsStudent">
+            <option value="">-- Chọn học sinh --</option>
+          </select>
+        </label>
+        <button id="loadStudentStats" class="primary">Xem thống kê</button>
+      </div>
+
+      <div id="studentStatsInfo" class="card" style="display:none; margin-top:16px">
+        <h2 id="statsStudentName"></h2>
+        <div class="stats-grid" id="statsSummary"></div>
+      </div>
+
+      <div class="card table-wrap" style="margin-top:16px">
+        <h2>Chi tiết theo tuần</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Tuần</th>
+              <th>Môn học</th>
+              <th>Đánh giá</th>
+              <th>Thời gian cập nhật</th>
+            </tr>
+          </thead>
+          <tbody id="statsDetailBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB QUẢN LÝ -->
+    <section id="manage" class="panel" hidden>
+      <div class="manage-grid">
+        <form id="classForm" class="card">
+          <h2>Thêm lớp</h2>
+          <input name="name" placeholder="Ví dụ: 5D" required>
+          <button class="primary">Thêm lớp</button>
+        </form>
+
+        <form id="subjectForm" class="card">
+          <h2>Thêm môn học</h2>
+          <input name="name" placeholder="Ví dụ: Tin học" required>
+          <button class="primary">Thêm môn</button>
+        </form>
+
+        <form id="weekForm" class="card">
+          <h2>Thêm tuần</h2>
+          <input name="name" placeholder="Ví dụ: Tuần 12" required>
+          <button class="primary">Thêm tuần</button>
+        </form>
+
+        <form id="uploadForm" class="card">
+          <h2>Nạp danh sách học sinh</h2>
+          <label>Lớp nhận danh sách
+            <select id="uploadClass" required></select>
+          </label>
+          <input id="studentFile" type="file" accept=".xlsx,.xls,.csv" required>
+          <p class="hint">Hỗ trợ file Excel gốc của trường (.xls/.xlsx)</p>
+          <button class="primary">Nạp học sinh</button>
+        </form>
+      </div>
+
+      <div id="manageMsg" class="message"></div>
+
+      <div class="manage-lists">
+        <div class="card">
+          <h2>Danh sách lớp</h2>
+          <div id="classList" class="list-box"></div>
+        </div>
+        <div class="card">
+          <h2>Danh sách môn học</h2>
+          <div id="subjectList" class="list-box"></div>
+        </div>
+        <div class="card">
+          <h2>Danh sách tuần</h2>
+          <div id="weekList" class="list-box"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <h2>Quản lý học sinh theo lớp</h2>
+        <label>Chọn lớp
+          <select id="manageStudentClass"></select>
+        </label>
+        <div id="studentManageList" class="list-box" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>Tài khoản đăng nhập</h2>
+        <p>Tạo tài khoản trong tab <b>Users</b> của Google Sheet: username, password, displayName, role, active.<br>
+        Vai trò: <code>admin</code> hoặc <code>teacher</code>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>Đánh giá thường xuyên · Dữ liệu lưu trên Google Sheets</footer>
 </div>
+
 <div id="toast" class="toast"></div>
-<script src="config.js"></script><script src="app.js"></script>
-</body></html>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
