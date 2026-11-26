@@ -38,6 +38,7 @@ async function api(action, data = {}) {
 $("loginForm").onsubmit = async e => {
   e.preventDefault();
   $("loginMsg").textContent = "Đang đăng nhập...";
+  $("loginForm").querySelector("button").disabled = true;
 
   try {
     const r = await api("login", {
@@ -48,33 +49,44 @@ $("loginForm").onsubmit = async e => {
     token = r.token;
     me = r.user;
     localStorage.setItem("dgt_token", token);
+
+    $("loginMsg").textContent = "Đang tải dữ liệu...";
     await enter();
   } catch (x) {
     $("loginMsg").textContent = x.message;
+  } finally {
+    $("loginForm").querySelector("button").disabled = false;
   }
 };
 
 async function enter() {
-  const r = await api("init");
-  meta = r.meta;
-
-  // Ẩn form đăng nhập chắc chắn
+  // Ẩn form đăng nhập ngay lập tức để người dùng thấy đang vào
   const loginView = $("loginView");
   if (loginView) {
     loginView.hidden = true;
     loginView.style.display = "none";
   }
-
   $("appView").hidden = false;
-  $("userLabel").textContent = me?.displayName || me?.username || "";
+  $("userLabel").textContent = me?.displayName || me?.username || "Đang tải...";
 
   document.querySelectorAll(".admin-only").forEach(x => {
     x.hidden = me?.role !== "admin";
   });
 
-  fillSelects();
-  await loadStudents();
-  showTab("evaluate");
+  try {
+    // Chỉ gọi init trước
+    const r = await api("init");
+    meta = r.meta;
+    fillSelects();
+
+    $("userLabel").textContent = me?.displayName || me?.username || "";
+
+    // Load học sinh sau (không chặn giao diện)
+    loadStudents();
+    showTab("evaluate");
+  } catch (e) {
+    toast("Lỗi tải dữ liệu: " + e.message);
+  }
 }
 
 $("logoutBtn").onclick = () => {
