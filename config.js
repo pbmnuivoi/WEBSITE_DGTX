@@ -1,1 +1,1 @@
-window.APP_CONFIG = { API_URL: "https://website-dgtx.netlify.app/.netlify/functions/api" };
+window.APP_CONFIG = { API_URL: "https://cong-thong-tin-truong-hoc.pbmnuivoi.workers.dev/" };
