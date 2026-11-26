@@ -151,16 +151,20 @@ document.querySelectorAll(".tab").forEach(btn => {
 });
 
 // ==================== ĐÁNH GIÁ (nhanh – theo 1 tuần) ====================
-$("weekSelect").onchange = () => {
-  localStorage.setItem("dgt_week", $("weekSelect").value);
-  loadStudents();
-};
-$("subjectSelect").onchange = () => {
-  localStorage.setItem("dgt_subject", $("subjectSelect").value);
-  loadStudents();
-};
-$("classSelect").onchange = loadStudents;
-$("studentSearch").oninput = renderStudents;
+if ($("weekSelect")) {
+  $("weekSelect").onchange = () => {
+    localStorage.setItem("dgt_week", $("weekSelect").value);
+    loadStudents();
+  };
+}
+if ($("subjectSelect")) {
+  $("subjectSelect").onchange = () => {
+    localStorage.setItem("dgt_subject", $("subjectSelect").value);
+    loadStudents();
+  };
+}
+if ($("classSelect")) $("classSelect").onchange = loadStudents;
+if ($("studentSearch")) $("studentSearch").oninput = renderStudents;
 
 async function loadStudents() {
   const classId = $("classSelect").value;
@@ -513,7 +517,7 @@ function renderTableList(tbodyId, items, updateAction, deleteAction) {
   });
 }
 
-$("manageStudentClass").onchange = loadStudentManageList;
+if ($("manageStudentClass")) $("manageStudentClass").onchange = loadStudentManageList;
 
 async function loadStudentManageList() {
   const classId = $("manageStudentClass").value;
