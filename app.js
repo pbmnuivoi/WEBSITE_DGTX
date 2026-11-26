@@ -5,7 +5,7 @@ let token = "";
 let me = null;
 let meta = { classes: [], subjects: [], weeks: [] };
 let students = [];
-let assessmentsMap = {}; // key: studentId_weekId → value
+let assessments = {};
 
 const rating = [
   { v: "TOT", i: "★", t: "Tốt" },
@@ -115,21 +115,32 @@ function fill(id, arr, placeholder) {
 }
 
 function fillSelects() {
+  fill("weekSelect", meta.weeks);
   fill("subjectSelect", meta.subjects, "Chọn môn");
   fill("classSelect", meta.classes, "Chọn lớp");
+
   fill("statsWeek", meta.weeks, "Tất cả tuần");
   fill("statsSubject", meta.subjects, "Tất cả môn");
+  fill("statsClassFilter", meta.classes, "Tất cả lớp");
+
   fill("statsClass", meta.classes, "Chọn lớp");
   fill("statsStudentSubject", meta.subjects, "Tất cả môn");
+
   fill("uploadClass", meta.classes, "Chọn lớp");
   fill("manageStudentClass", meta.classes, "Chọn lớp");
+
+  // Khôi phục lựa chọn tuần/môn đã lưu
+  const w = localStorage.getItem("dgt_week");
+  const s = localStorage.getItem("dgt_subject");
+  if (w && [...$("weekSelect").options].some(o => o.value === w)) $("weekSelect").value = w;
+  if (s && [...$("subjectSelect").options].some(o => o.value === s)) $("subjectSelect").value = s;
 }
 
 // ==================== TABS ====================
 function showTab(id) {
   document.querySelectorAll(".panel").forEach(p => p.hidden = p.id !== id);
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === id));
-  if (id === "evaluate") loadEvalTable();
+  if (id === "evaluate") loadStudents();
   if (id === "manage") {
     renderManageTables();
     loadStudentManageList();
@@ -139,146 +150,118 @@ document.querySelectorAll(".tab").forEach(btn => {
   btn.onclick = () => showTab(btn.dataset.tab);
 });
 
-// ==================== ĐÁNH GIÁ – BẢNG MA TRẬN ====================
-$("classSelect").onchange = loadEvalTable;
-$("subjectSelect").onchange = loadEvalTable;
-$("studentSearch").oninput = () => renderEvalTable();
-$("reloadEval").onclick = loadEvalTable;
+// ==================== ĐÁNH GIÁ (nhanh – theo 1 tuần) ====================
+$("weekSelect").onchange = () => {
+  localStorage.setItem("dgt_week", $("weekSelect").value);
+  loadStudents();
+};
+$("subjectSelect").onchange = () => {
+  localStorage.setItem("dgt_subject", $("subjectSelect").value);
+  loadStudents();
+};
+$("classSelect").onchange = loadStudents;
+$("studentSearch").oninput = renderStudents;
 
-async function loadEvalTable() {
+async function loadStudents() {
   const classId = $("classSelect").value;
+  const weekId = $("weekSelect").value;
   const subjectId = $("subjectSelect").value;
 
-  if (!classId || !subjectId) {
-    $("evalBody").innerHTML = `<tr><td colspan="30" class="empty">Vui lòng chọn Lớp và Môn học</td></tr>`;
+  if (!classId || !weekId || !subjectId) {
+    $("evalBody").innerHTML = `<tr><td colspan="3" class="empty">Vui lòng chọn đủ Tuần – Môn – Lớp</td></tr>`;
     return;
   }
 
-  $("evalBody").innerHTML = `<tr><td colspan="30" class="empty">Đang tải dữ liệu...</td></tr>`;
+  $("evalBody").innerHTML = `<tr><td colspan="3" class="empty">Đang tải...</td></tr>`;
 
   try {
-    const r = await api("students", { classId });
-    students = r.students || [];
-
-    // Lấy tất cả đánh giá của lớp + môn (mọi tuần)
-    assessmentsMap = {};
-    for (const week of meta.weeks) {
-      const a = await api("getAssessments", {
-        classId,
-        weekId: week.id,
-        subjectId
-      });
-      Object.entries(a.assessments || {}).forEach(([sid, val]) => {
-        assessmentsMap[`${sid}_${week.id}`] = val;
-      });
-    }
-
-    renderEvalTable();
+    const [stuRes, assRes] = await Promise.all([
+      api("students", { classId }),
+      api("getAssessments", { classId, weekId, subjectId })
+    ]);
+    students = stuRes.students || [];
+    assessments = assRes.assessments || {};
+    renderStudents();
   } catch (e) {
-    $("evalBody").innerHTML = `<tr><td colspan="30" class="empty">${e.message}</td></tr>`;
+    $("evalBody").innerHTML = `<tr><td colspan="3" class="empty">${e.message}</td></tr>`;
   }
 }
 
-function renderEvalTable() {
+function renderStudents() {
   const q = ($("studentSearch").value || "").toLocaleLowerCase("vi");
   const list = students.filter(s => s.name.toLocaleLowerCase("vi").includes(q));
-
-  // Header
-  const header = $("evalHeader");
-  header.innerHTML = `<th class="student-col">Học sinh</th>`;
-  meta.weeks.forEach(w => {
-    const th = document.createElement("th");
-    th.className = "week-col";
-    th.textContent = w.name;
-    header.append(th);
-  });
-
-  // Body
   const body = $("evalBody");
   body.innerHTML = "";
 
   if (!list.length) {
-    body.innerHTML = `<tr><td colspan="${meta.weeks.length + 1}" class="empty">Không tìm thấy học sinh</td></tr>`;
+    body.innerHTML = `<tr><td colspan="3" class="empty">Không tìm thấy học sinh</td></tr>`;
     return;
   }
 
   list.forEach(s => {
     const tr = document.createElement("tr");
 
-    // Cột tên học sinh
     const tdName = document.createElement("td");
-    tdName.className = "student-col";
-    tdName.innerHTML = `<div>${s.name}</div><div style="font-size:12px;color:#64748b;font-weight:400">${s.code || ""}</div>`;
+    tdName.innerHTML = `<strong>${s.name}</strong>`;
     tr.append(tdName);
 
-    // Các cột tuần
-    meta.weeks.forEach(w => {
-      const td = document.createElement("td");
-      td.className = "cell";
-      const key = `${s.id}_${w.id}`;
-      const current = assessmentsMap[key] || "";
+    const tdCode = document.createElement("td");
+    tdCode.textContent = s.code || "";
+    tdCode.style.color = "#64748b";
+    tr.append(tdCode);
 
-      const wrap = document.createElement("div");
-      wrap.style.display = "flex";
-      wrap.style.gap = "4px";
-      wrap.style.justifyContent = "center";
+    const tdRate = document.createElement("td");
+    tdRate.style.textAlign = "center";
+    const wrap = document.createElement("div");
+    wrap.style.display = "inline-flex";
+    wrap.style.gap = "6px";
 
-      rating.forEach(r => {
-        const btn = document.createElement("button");
-        btn.className = "rate-btn" + (current === r.v ? ` selected-${r.v}` : "");
-        btn.textContent = r.i;
-        btn.title = r.t;
-        btn.onclick = () => saveCell(s, w, r.v, btn);
-        wrap.append(btn);
-      });
-
-      td.append(wrap);
-      tr.append(td);
+    rating.forEach(r => {
+      const btn = document.createElement("button");
+      btn.className = "rate-btn" + (assessments[s.id] === r.v ? ` selected-${r.v}` : "");
+      btn.textContent = r.i;
+      btn.title = r.t;
+      btn.onclick = () => saveRating(s, r.v);
+      wrap.append(btn);
     });
 
+    tdRate.append(wrap);
+    tr.append(tdRate);
     body.append(tr);
   });
 }
 
-async function saveCell(student, week, value, btn) {
-  const classId = $("classSelect").value;
-  const subjectId = $("subjectSelect").value;
-  const key = `${student.id}_${week.id}`;
-  const old = assessmentsMap[key];
-
-  assessmentsMap[key] = value;
-  // cập nhật UI ngay
-  const parent = btn.parentElement;
-  parent.querySelectorAll(".rate-btn").forEach(b => {
-    b.className = "rate-btn";
-  });
-  btn.className = `rate-btn selected-${value}`;
-
-  $("saveStatus").textContent = `Đang lưu ${student.name} – ${week.name}...`;
+async function saveRating(student, value) {
+  const key = student.id;
+  const old = assessments[key];
+  assessments[key] = value;
+  renderStudents();
+  $("saveStatus").textContent = `Đang lưu ${student.name}...`;
 
   try {
     await api("saveAssessment", {
-      studentId: student.id,
-      classId,
-      weekId: week.id,
-      subjectId,
+      studentId: key,
+      classId: $("classSelect").value,
+      weekId: $("weekSelect").value,
+      subjectId: $("subjectSelect").value,
       value
     });
-    $("saveStatus").textContent = `Đã lưu: ${student.name} · ${week.name} · ${rating.find(x => x.v === value).t}`;
+    $("saveStatus").textContent = `Đã lưu: ${student.name} · ${rating.find(x => x.v === value).t}`;
   } catch (e) {
-    assessmentsMap[key] = old;
-    renderEvalTable();
+    assessments[key] = old;
+    renderStudents();
     $("saveStatus").textContent = "Lỗi: " + e.message;
   }
 }
 
 // ==================== THỐNG KÊ ====================
-// Top lớp
+// Top 1-10 lớp
 $("loadClassRank").onclick = async () => {
   try {
     const r = await api("stats", {
       weekId: $("statsWeek").value,
-      subjectId: $("statsSubject").value
+      subjectId: $("statsSubject").value,
+      classId: $("statsClassFilter").value
     });
 
     $("classRankSummary").innerHTML = "";
@@ -310,33 +293,60 @@ $("loadClassRank").onclick = async () => {
   }
 };
 
-// Thống kê 1 học sinh
-$("statsClass").onchange = async () => {
+// Thống kê học sinh – dùng ô nhập tên, không dùng select
+$("loadStudentStats").onclick = async () => {
   const classId = $("statsClass").value;
-  const sel = $("statsStudent");
-  sel.innerHTML = `<option value="">-- Chọn học sinh --</option>`;
-  if (!classId) return;
+  const nameQuery = ($("statsStudentName").value || "").trim().toLocaleLowerCase("vi");
+
+  if (!classId) return toast("Vui lòng chọn lớp");
+
+  $("studentListBox").style.display = "none";
+  $("studentStatsInfo").style.display = "none";
+
   try {
     const r = await api("students", { classId });
-    (r.students || []).forEach(s => {
-      const o = document.createElement("option");
-      o.value = s.id;
-      o.textContent = s.name + (s.code ? ` (${s.code})` : "");
-      sel.append(o);
+    let list = r.students || [];
+
+    if (nameQuery) {
+      list = list.filter(s => s.name.toLocaleLowerCase("vi").includes(nameQuery));
+    }
+
+    // Nếu chỉ còn đúng 1 học sinh → hiện chi tiết luôn
+    if (list.length === 1) {
+      await showStudentDetail(list[0].id, list[0]);
+      return;
+    }
+
+    // Nhiều học sinh hoặc không nhập tên → hiện danh sách
+    $("studentListBox").style.display = "block";
+    const tbody = $("statsStudentList");
+    tbody.innerHTML = "";
+
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="3" class="empty">Không tìm thấy học sinh</td></tr>`;
+      return;
+    }
+
+    list.forEach(s => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${s.name}</strong></td>
+        <td style="color:#64748b">${s.code || ""}</td>
+        <td><button class="ghost small">Xem thống kê</button></td>
+      `;
+      tr.querySelector("button").onclick = () => showStudentDetail(s.id, s);
+      tbody.append(tr);
     });
   } catch (e) {
     toast(e.message);
   }
 };
 
-$("loadStudentStats").onclick = async () => {
-  const studentId = $("statsStudent").value;
-  if (!studentId) return toast("Vui lòng chọn học sinh");
-
+async function showStudentDetail(studentId, studentInfo) {
   try {
     const r = await api("studentStats", { studentId });
 
-    // Lọc theo môn nếu có chọn
+    // Lọc theo môn nếu có
     const subjectFilter = $("statsStudentSubject").value;
     let detail = r.detail || [];
     if (subjectFilter) {
@@ -344,11 +354,12 @@ $("loadStudentStats").onclick = async () => {
       detail = detail.filter(d => d.subjectName === subName);
     }
 
+    $("studentListBox").style.display = "none";
     $("studentStatsInfo").style.display = "block";
-    $("statsStudentName").textContent =
+
+    $("statsStudentNameTitle").textContent =
       `${r.student.name}${r.student.code ? " (" + r.student.code + ")" : ""}`;
 
-    // summary (tính lại nếu lọc môn)
     const summary = {
       good: detail.filter(x => x.value === "TOT").length,
       complete: detail.filter(x => x.value === "HT").length,
@@ -373,7 +384,7 @@ $("loadStudentStats").onclick = async () => {
     body.innerHTML = "";
 
     if (!detail.length) {
-      body.innerHTML = `<tr><td colspan="5" class="empty">Chưa có dữ liệu</td></tr>`;
+      body.innerHTML = `<tr><td colspan="5" class="empty">Chưa có dữ liệu đánh giá</td></tr>`;
       return;
     }
 
@@ -386,21 +397,20 @@ $("loadStudentStats").onclick = async () => {
         <td>${item.subjectName}</td>
         <td>${map[item.value] || item.value}</td>
         <td>${item.updatedAt ? new Date(item.updatedAt).toLocaleString("vi") : ""}</td>
-        <td>
-          <button class="ghost small edit-eval">Sửa</button>
-        </td>
+        <td><button class="ghost small edit-eval">Sửa</button></td>
       `;
       tr.querySelector(".edit-eval").onclick = () => {
-        const newVal = prompt("Chọn mức mới:\n1 = Tốt\n2 = Hoàn thành\n3 = Cần cố gắng", 
+        const choice = prompt("Chọn mức mới:\n1 = Tốt\n2 = Hoàn thành\n3 = Cần cố gắng",
           item.value === "TOT" ? "1" : item.value === "HT" ? "2" : "3");
-        if (!newVal) return;
+        if (!choice) return;
         const valMap = { "1": "TOT", "2": "HT", "3": "CĐ" };
-        const v = valMap[newVal.trim()];
+        const v = valMap[choice.trim()];
         if (!v) return toast("Giá trị không hợp lệ");
-        // Tìm weekId + subjectId để gọi save
+
         const week = meta.weeks.find(w => w.name === item.weekName);
         const subject = meta.subjects.find(s => s.name === item.subjectName);
         if (!week || !subject) return toast("Không tìm thấy tuần/môn");
+
         api("saveAssessment", {
           studentId,
           classId: $("statsClass").value,
@@ -408,8 +418,8 @@ $("loadStudentStats").onclick = async () => {
           subjectId: subject.id,
           value: v
         }).then(() => {
-          toast("Đã cập nhật đánh giá");
-          $("loadStudentStats").click();
+          toast("Đã cập nhật");
+          showStudentDetail(studentId, studentInfo);
         }).catch(e => toast(e.message));
       };
       body.append(tr);
@@ -417,7 +427,7 @@ $("loadStudentStats").onclick = async () => {
   } catch (e) {
     toast(e.message);
   }
-};
+}
 
 // ==================== QUẢN LÝ ====================
 function setLoading(btn, loading, text = "Đang xử lý...") {
@@ -467,12 +477,10 @@ function renderTableList(tbodyId, items, updateAction, deleteAction) {
   const tbody = $(tbodyId);
   if (!tbody) return;
   tbody.innerHTML = "";
-
   if (!items.length) {
     tbody.innerHTML = `<tr><td colspan="2" class="empty">Chưa có dữ liệu</td></tr>`;
     return;
   }
-
   items.forEach(item => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -505,7 +513,6 @@ function renderTableList(tbodyId, items, updateAction, deleteAction) {
   });
 }
 
-// Học sinh trong quản lý
 $("manageStudentClass").onchange = loadStudentManageList;
 
 async function loadStudentManageList() {
