@@ -347,6 +347,8 @@ $("loadClassRank").onclick = async () => {
 $("loadStudentStats").onclick = async () => {
   const classId = $("statsClass").value;
   const nameQuery = ($("statsStudentName").value || "").trim().toLocaleLowerCase("vi");
+  const semester = $("statsStudentSemester") ? $("statsStudentSemester").value : "";
+  const subjectId = $("statsStudentSubject") ? $("statsStudentSubject").value : "";
 
   if (!classId) return toast("Vui lòng chọn lớp");
 
@@ -354,7 +356,12 @@ $("loadStudentStats").onclick = async () => {
   $("studentStatsInfo").style.display = "none";
 
   try {
-    const r = await api("students", { classId });
+    // Lấy danh sách + % Tốt theo bộ lọc
+    const r = await api("classStudentStats", {
+      classId,
+      semester,
+      subjectId
+    });
     let list = r.students || [];
 
     if (nameQuery) {
@@ -367,13 +374,13 @@ $("loadStudentStats").onclick = async () => {
       return;
     }
 
-    // Nhiều học sinh hoặc không nhập tên → hiện danh sách
+    // Hiện danh sách kèm % Tốt
     $("studentListBox").style.display = "block";
     const tbody = $("statsStudentList");
     tbody.innerHTML = "";
 
     if (!list.length) {
-      tbody.innerHTML = `<tr><td colspan="3" class="empty">Không tìm thấy học sinh</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="empty">Không tìm thấy học sinh</td></tr>`;
       return;
     }
 
@@ -382,7 +389,11 @@ $("loadStudentStats").onclick = async () => {
       tr.innerHTML = `
         <td><strong>${s.name}</strong></td>
         <td style="color:#64748b">${s.code || ""}</td>
-        <td><button class="ghost small">Xem thống kê</button></td>
+        <td>${s.good || 0}</td>
+        <td>${s.complete || 0}</td>
+        <td>${s.needImprove || 0}</td>
+        <td><strong>${s.goodRate || 0}%</strong></td>
+        <td><button class="ghost small">Xem chi tiết</button></td>
       `;
       tr.querySelector("button").onclick = () => showStudentDetail(s.id, s);
       tbody.append(tr);
