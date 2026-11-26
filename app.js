@@ -394,7 +394,10 @@ $("loadStudentStats").onclick = async () => {
 
 async function showStudentDetail(studentId, studentInfo) {
   try {
-    const r = await api("studentStats", { studentId });
+    const r = await api("studentStats", {
+      studentId,
+      semester: $("statsStudentSemester") ? $("statsStudentSemester").value : ""
+    });
 
     // Lọc theo môn nếu có
     const subjectFilter = $("statsStudentSubject").value;
