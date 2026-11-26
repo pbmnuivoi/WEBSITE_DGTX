@@ -43,9 +43,12 @@
   </nav>
 
   <main>
-    <!-- ==================== TAB ĐÁNH GIÁ (BẢNG MA TRẬN) ==================== -->
+    <!-- ==================== TAB ĐÁNH GIÁ (theo tuần) ==================== -->
     <section id="evaluate" class="panel">
       <div class="toolbar card">
+        <label>Tuần
+          <select id="weekSelect"></select>
+        </label>
         <label>Môn học
           <select id="subjectSelect"></select>
         </label>
@@ -55,26 +58,26 @@
         <label class="search">Tìm học sinh
           <input id="studentSearch" placeholder="Nhập họ tên...">
         </label>
-        <button id="reloadEval" class="ghost">Làm mới</button>
       </div>
 
       <div class="legend">
         <span>★ Tốt</span>
         <span>✿ Hoàn thành</span>
         <span>ϟ Cần cố gắng</span>
-        <span class="muted">Bấm vào ô để thay đổi đánh giá</span>
+        <span class="muted">Bấm biểu tượng để lưu / chỉnh sửa</span>
       </div>
 
       <div class="table-wrap">
-        <table class="eval-table" id="evalTable">
+        <table>
           <thead>
-            <tr id="evalHeader">
-              <th class="student-col">Học sinh</th>
-              <!-- các cột tuần sẽ được render bằng JS -->
+            <tr>
+              <th style="min-width:220px">Học sinh</th>
+              <th style="min-width:80px">Mã HS</th>
+              <th style="text-align:center">Đánh giá</th>
             </tr>
           </thead>
           <tbody id="evalBody">
-            <tr><td colspan="20" class="empty">Chọn lớp và môn học để hiển thị bảng đánh giá</td></tr>
+            <tr><td colspan="3" class="empty">Chọn Tuần – Môn – Lớp để bắt đầu đánh giá</td></tr>
           </tbody>
         </table>
       </div>
@@ -83,7 +86,8 @@
 
     <!-- ==================== TAB THỐNG KÊ ==================== -->
     <section id="stats" class="panel" hidden>
-      <!-- Phần Top lớp -->
+
+      <!-- Top 1-10 lớp -->
       <div class="card">
         <h2>Top 1–10 lớp</h2>
         <div class="toolbar" style="margin-bottom:14px">
@@ -92,6 +96,11 @@
           </label>
           <label>Môn học
             <select id="statsSubject"></select>
+          </label>
+          <label>Lớp
+            <select id="statsClassFilter">
+              <option value="">Tất cả lớp</option>
+            </select>
           </label>
           <button id="loadClassRank" class="primary">Xem xếp hạng</button>
         </div>
@@ -113,7 +122,7 @@
         </div>
       </div>
 
-      <!-- Phần thống kê 1 học sinh -->
+      <!-- Thống kê theo học sinh -->
       <div class="card" style="margin-top:20px">
         <h2>Thống kê theo học sinh</h2>
         <div class="toolbar" style="margin-bottom:14px">
@@ -121,20 +130,34 @@
             <select id="statsClass"></select>
           </label>
           <label>Môn học
-            <select id="statsStudentSubject"></select>
-          </label>
-          <label>Học sinh
-            <select id="statsStudent">
-              <option value="">-- Chọn học sinh --</option>
+            <select id="statsStudentSubject">
+              <option value="">Tất cả môn</option>
             </select>
           </label>
-          <button id="loadStudentStats" class="primary">Xem chi tiết</button>
+          <label class="search">Tên học sinh
+            <input id="statsStudentName" placeholder="Nhập tên để tìm...">
+          </label>
+          <button id="loadStudentStats" class="primary">Xem thống kê</button>
         </div>
 
-        <div id="studentStatsInfo" style="display:none">
-          <h3 id="statsStudentName" style="margin-bottom:12px;font-size:16px"></h3>
-          <div class="stats-grid" id="statsSummary"></div>
+        <!-- Danh sách học sinh (khi chưa nhập tên hoặc tìm nhiều) -->
+        <div id="studentListBox" class="table-wrap" style="margin-bottom:16px;display:none">
+          <table>
+            <thead>
+              <tr>
+                <th>Họ và tên</th>
+                <th>Mã HS</th>
+                <th style="width:120px">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="statsStudentList"></tbody>
+          </table>
+        </div>
 
+        <!-- Chi tiết 1 học sinh -->
+        <div id="studentStatsInfo" style="display:none">
+          <h3 id="statsStudentNameTitle" style="margin-bottom:12px;font-size:16px"></h3>
+          <div class="stats-grid" id="statsSummary"></div>
           <div class="table-wrap" style="margin-top:12px">
             <table>
               <thead>
@@ -143,7 +166,7 @@
                   <th>Môn học</th>
                   <th>Đánh giá</th>
                   <th>Thời gian</th>
-                  <th>Thao tác</th>
+                  <th style="width:100px">Thao tác</th>
                 </tr>
               </thead>
               <tbody id="statsDetailBody"></tbody>
