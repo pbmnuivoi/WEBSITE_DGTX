@@ -141,9 +141,6 @@ function fillSelects() {
   if (sub && [...$("subjectSelect").options].some(o => o.value === sub)) $("subjectSelect").value = sub;
   const cls = localStorage.getItem("dgt_class");
   if (cls && [...$("classSelect").options].some(o => o.value === cls)) $("classSelect").value = cls;
-  const sc = localStorage.getItem("dgt_slotCount");
-  if (sc) $("slotCountSelect").value = sc;
-
   renderEvalTable();
 }
 
@@ -160,13 +157,13 @@ function showTab(name) {
 }
 
 // ==================== EVALUATE ====================
-["semesterSelect", "subjectSelect", "classSelect", "slotCountSelect"].forEach(id => {
-  if ($(id)) {
-    $(id).onchange = () => {
-      localStorage.setItem("dgt_semester", $("semesterSelect").value);
-      localStorage.setItem("dgt_subject", $("subjectSelect").value);
-      localStorage.setItem("dgt_class", $("classSelect").value);
-      localStorage.setItem("dgt_slotCount", $("slotCountSelect").value);
+["semesterSelect", "subjectSelect", "classSelect"].forEach(id => {
+  const el = $(id);
+  if (el) {
+    el.onchange = () => {
+      if ($("semesterSelect")) localStorage.setItem("dgt_semester", $("semesterSelect").value);
+      if ($("subjectSelect")) localStorage.setItem("dgt_subject", $("subjectSelect").value);
+      if ($("classSelect")) localStorage.setItem("dgt_class", $("classSelect").value);
       renderEvalTable();
     };
   }
@@ -177,7 +174,7 @@ if ($("studentSearch")) {
 }
 
 async function renderEvalTable() {
-  currentSlotCount = Number($("slotCountSelect").value) || 6;
+  currentSlotCount = 6; // luôn 6 lần như mẫu ảnh
   const semester = $("semesterSelect").value;
   const subjectId = $("subjectSelect").value;
   const classId = $("classSelect").value;
@@ -192,17 +189,16 @@ async function renderEvalTable() {
     return;
   }
 
-  // Build header: STT | Học sinh | Đánh giá HTT (1..n) | Đánh giá HT (1..n)
+  // Header giống mẫu ảnh: STT | Học sinh | Đánh giá HTT 1-6 | Đánh giá HT 1-6
   let h = `<tr>
-    <th style="min-width:40px">STT</th>
-    <th style="min-width:180px">Học sinh</th>
+    <th rowspan="2" style="min-width:44px;vertical-align:middle">STT</th>
+    <th rowspan="2" style="min-width:180px;vertical-align:middle">Học sinh</th>
     <th colspan="${currentSlotCount}" class="htt-header">Đánh giá HTT</th>
     <th colspan="${currentSlotCount}" class="ht-header">Đánh giá HT</th>
   </tr>
-  <tr>
-    <th></th><th></th>`;
-  for (let i = 1; i <= currentSlotCount; i++) h += `<th class="slot-h">${i}</th>`;
-  for (let i = 1; i <= currentSlotCount; i++) h += `<th class="slot-h">${i}</th>`;
+  <tr>`;
+  for (let i = 1; i <= currentSlotCount; i++) h += `<th class="slot-h htt-slot">${i}</th>`;
+  for (let i = 1; i <= currentSlotCount; i++) h += `<th class="slot-h ht-slot">${i}</th>`;
   h += `</tr>`;
   head.innerHTML = h;
 
@@ -329,7 +325,7 @@ async function toggleStar(btn) {
 }
 
 // ==================== PRINT ====================
-$("printBtn").onclick = async () => {
+if ($("printBtn")) $("printBtn").onclick = async () => {
   const classId = $("classSelect").value;
   const semester = $("semesterSelect").value;
   const ps = $("printSubjects");
@@ -426,7 +422,7 @@ function openPrintWindow(data) {
 }
 
 // ==================== STATS ====================
-$("loadClassRank").onclick = async () => {
+if ($("loadClassRank")) $("loadClassRank").onclick = async () => {
   try {
     const r = await api("stats", {
       mode: "class",
@@ -464,7 +460,7 @@ $("loadClassRank").onclick = async () => {
   }
 };
 
-$("loadStudentStats").onclick = async () => {
+if ($("loadStudentStats")) $("loadStudentStats").onclick = async () => {
   const classId = $("statsClass").value;
   if (!classId) {
     toast("Chọn lớp trước");
@@ -564,11 +560,9 @@ function loadConfigSlots() {
   box.innerHTML = html;
 }
 
-$("loadConfigBtn").onclick = () => loadConfigSlots();
-
-$("configSubject").onchange = () => loadConfigSlots();
-
-$("saveConfigBtn").onclick = async () => {
+if ($("loadConfigBtn")) $("loadConfigBtn").onclick = () => loadConfigSlots();
+if ($("configSubject")) $("configSubject").onchange = () => loadConfigSlots();
+if ($("saveConfigBtn")) $("saveConfigBtn").onclick = async () => {
   const subjectId = $("configSubject").value;
   if (!subjectId) {
     toast("Chọn môn học trước");
@@ -644,7 +638,7 @@ function refreshManageLists() {
   loadManageStudents();
 }
 
-$("manageStudentClass").onchange = () => loadManageStudents();
+if ($("manageStudentClass")) $("manageStudentClass").onchange = () => loadManageStudents();
 
 async function loadManageStudents() {
   const classId = $("manageStudentClass").value;
@@ -679,7 +673,7 @@ async function loadManageStudents() {
   }
 }
 
-$("classForm").onsubmit = async e => {
+if ($("classForm")) $("classForm").onsubmit = async e => {
   e.preventDefault();
   const name = e.target.name.value.trim();
   try {
@@ -693,7 +687,7 @@ $("classForm").onsubmit = async e => {
   } catch (err) { toast(err.message); }
 };
 
-$("subjectForm").onsubmit = async e => {
+if ($("subjectForm")) $("subjectForm").onsubmit = async e => {
   e.preventDefault();
   const name = e.target.name.value.trim();
   try {
@@ -707,10 +701,10 @@ $("subjectForm").onsubmit = async e => {
   } catch (err) { toast(err.message); }
 };
 
-$("uploadForm").onsubmit = async e => {
+if ($("uploadForm")) $("uploadForm").onsubmit = async e => {
   e.preventDefault();
-  const classId = $("uploadClass").value;
-  const file = $("studentFile").files[0];
+  const classId = $("uploadClass")?.value;
+  const file = $("studentFile")?.files?.[0];
   if (!file) return;
   try {
     const list = await parseStudentFile(file);
@@ -738,7 +732,7 @@ async function parseStudentFile(file) {
   return list;
 }
 
-$("clearAssessmentsBtn").onclick = async () => {
+if ($("clearAssessmentsBtn")) $("clearAssessmentsBtn").onclick = async () => {
   if (!confirm("Bạn chắc chắn muốn xóa dữ liệu đánh giá? Hành động không thể hoàn tác.")) return;
   try {
     const r = await api("clearAssessments", {
