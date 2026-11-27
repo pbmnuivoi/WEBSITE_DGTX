@@ -558,31 +558,61 @@ header {
 header b { font-size: 15px; }
 header small { display: block; color: var(--muted); font-size: 12px; }
 
-
-/* Sticky STT + Tên học sinh khi kéo ngang (điện thoại) */
-#evalTable th:nth-child(1),
-#evalTable td:nth-child(1) {
+/* ===== Sticky cột STT + Tên (kéo ngang trên điện thoại) ===== */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+#evalTable {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+#evalTable .col-stt {
   position: sticky;
   left: 0;
-  z-index: 3;
+  z-index: 5;
   background: #fff;
-  min-width: 40px;
+  min-width: 42px;
+  max-width: 48px;
+  text-align: center;
+  box-shadow: 1px 0 0 #e2e8f0;
 }
-#evalTable th:nth-child(2),
-#evalTable td:nth-child(2) {
+#evalTable .col-name {
   position: sticky;
-  left: 40px;
-  z-index: 3;
+  left: 42px;
+  z-index: 5;
   background: #fff;
-  min-width: 140px;
-  box-shadow: 2px 0 4px rgba(0,0,0,.06);
+  min-width: 150px;
+  max-width: 200px;
+  text-align: left;
+  padding-left: 10px !important;
+  box-shadow: 3px 0 6px rgba(0,0,0,.08);
 }
-#evalTable thead th:nth-child(1),
-#evalTable thead th:nth-child(2) {
-  z-index: 4;
-  background: #f1f5f9;
+#evalTable thead .col-stt,
+#evalTable thead .col-name {
+  z-index: 6;
+  background: #ecfdf5;
+  vertical-align: middle;
 }
-#evalTable tr:hover td:nth-child(1),
-#evalTable tr:hover td:nth-child(2) {
-  background: #f8fafc;
+#evalTable tbody tr:hover .col-stt,
+#evalTable tbody tr:hover .col-name {
+  background: #f0fdf4;
 }
+#evalTable .htt-header {
+  background: #fef9c3 !important;
+  color: #a16207 !important;
+}
+#evalTable .ht-header {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+#evalTable .htt-slot {
+  background: #fefce8 !important;
+  color: #a16207;
+}
+#evalTable .ht-slot {
+  background: #f0fdf4 !important;
+  color: #166534;
+}
+
