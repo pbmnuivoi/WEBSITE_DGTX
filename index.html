@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Đánh giá thường xuyên</title>
+  <title>Đánh giá học tập – HTT / HT</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -13,8 +13,8 @@
 <div id="loginView" class="login-wrap">
   <form id="loginForm" class="login">
     <div class="brand">✦</div>
-    <h1>Đánh giá thường xuyên</h1>
-    <p>Hệ thống quản lý đánh giá học sinh</p>
+    <h1>Đánh giá học tập</h1>
+    <p>Hệ thống quản lý đánh giá HTT / HT theo học kỳ</p>
     <label>Tài khoản
       <input id="username" autocomplete="username" required>
     </label>
@@ -30,7 +30,7 @@
 <div id="appView" hidden>
   <header>
     <div>
-      <b>✦ Đánh giá thường xuyên</b>
+      <b>✦ Đánh giá học tập</b>
       <small id="userLabel"></small>
     </div>
     <button id="logoutBtn" class="ghost">Đăng xuất</button>
@@ -39,45 +39,66 @@
   <nav class="tabs">
     <button class="tab active" data-tab="evaluate">Đánh giá</button>
     <button class="tab" data-tab="stats">Thống kê</button>
+    <button class="tab admin-only" data-tab="config">Cấu hình đánh giá</button>
     <button class="tab admin-only" data-tab="manage">Quản lý dữ liệu</button>
   </nav>
 
   <main>
-    <!-- ==================== TAB ĐÁNH GIÁ (theo tuần) ==================== -->
+    <!-- ==================== TAB ĐÁNH GIÁ ==================== -->
     <section id="evaluate" class="panel">
-      <div class="toolbar card">
-        <label>Tuần
-          <select id="weekSelect"></select>
-        </label>
-        <label>Môn học
-          <select id="subjectSelect"></select>
-        </label>
-        <label>Lớp
-          <select id="classSelect"></select>
-        </label>
-        <label class="search">Tìm học sinh
-          <input id="studentSearch" placeholder="Nhập họ tên...">
-        </label>
+      <div class="card">
+        <h2 style="margin-bottom:6px;color:#0f766e">Đánh giá Học tập theo môn, lớp</h2>
+        <p class="hint" style="margin-bottom:14px">Chọn học kỳ, môn, lớp. Bấm sao để đánh giá. Chọn HTT sẽ ẩn cột HT tương ứng.</p>
+
+        <div class="toolbar" style="flex-wrap:wrap;gap:12px">
+          <label>Học kỳ
+            <select id="semesterSelect">
+              <option value="1">Học kỳ 1</option>
+              <option value="2">Học kỳ 2</option>
+            </select>
+          </label>
+          <label>Môn đánh giá
+            <select id="subjectSelect"></select>
+          </label>
+          <label>Lớp
+            <select id="classSelect"></select>
+          </label>
+          <label class="search">Tìm học sinh
+            <input id="studentSearch" placeholder="Tên hoặc mã HS...">
+          </label>
+          <label>Số lần đánh giá
+            <select id="slotCountSelect">
+              <option value="6">6 lần</option>
+              <option value="5">5 lần</option>
+              <option value="4">4 lần</option>
+              <option value="3">3 lần</option>
+              <option value="2">2 lần</option>
+              <option value="1">1 lần</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="toolbar" style="margin-top:12px;flex-wrap:wrap;gap:12px;align-items:flex-end">
+          <label style="min-width:180px">Môn in (Ctrl để chọn nhiều)
+            <select id="printSubjects" multiple size="3" style="min-height:70px;width:100%"></select>
+          </label>
+          <button id="printBtn" class="primary">🖨 In biểu mẫu</button>
+        </div>
       </div>
 
-      <div class="legend">
-        <span>★ Tốt</span>
-        <span>✿ Hoàn thành</span>
-        <span>ϟ Cần cố gắng</span>
-        <span class="muted">Bấm biểu tượng để lưu / chỉnh sửa</span>
+      <div class="legend" style="margin:12px 0">
+        <span style="color:#ca8a04">★ Hoàn thành tốt (HTT)</span>
+        <span style="color:#64748b">☆ Hoàn thành (HT)</span>
+        <span class="muted">Bấm sao để lưu · Bấm lại để xóa</span>
       </div>
+
+      <div id="evalInfo" class="hint" style="margin-bottom:8px"></div>
 
       <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th style="min-width:220px">Học sinh</th>
-              <th style="min-width:80px">Mã HS</th>
-              <th style="text-align:center">Đánh giá</th>
-            </tr>
-          </thead>
+        <table id="evalTable">
+          <thead id="evalHead"></thead>
           <tbody id="evalBody">
-            <tr><td colspan="3" class="empty">Chọn Tuần – Môn – Lớp để bắt đầu đánh giá</td></tr>
+            <tr><td colspan="20" class="empty">Chọn Học kỳ – Môn – Lớp để bắt đầu đánh giá</td></tr>
           </tbody>
         </table>
       </div>
@@ -86,23 +107,20 @@
 
     <!-- ==================== TAB THỐNG KÊ ==================== -->
     <section id="stats" class="panel" hidden>
-
-      <!-- Top 1-10 lớp -->
       <div class="card">
-        <h2>Top 1–10 lớp</h2>
-        <div class="toolbar" style="margin-bottom:14px">
+        <h2>Top lớp / Thống kê</h2>
+        <div class="toolbar" style="margin-bottom:14px;flex-wrap:wrap">
           <label>Học kỳ
             <select id="statsSemester">
               <option value="">Cả năm</option>
-              <option value="1">Học kỳ 1 (Tuần 1–18)</option>
-              <option value="2">Học kỳ 2 (Tuần 19–35)</option>
+              <option value="1">Học kỳ 1</option>
+              <option value="2">Học kỳ 2</option>
             </select>
           </label>
-          <label>Tuần
-            <select id="statsWeek"></select>
-          </label>
           <label>Môn học
-            <select id="statsSubject"></select>
+            <select id="statsSubject">
+              <option value="">Tất cả môn</option>
+            </select>
           </label>
           <label>Lớp
             <select id="statsClassFilter">
@@ -118,10 +136,10 @@
               <tr>
                 <th>Hạng</th>
                 <th>Lớp</th>
-                <th>Tốt</th>
-                <th>Hoàn thành</th>
-                <th>Cần cố gắng</th>
-                <th>Tỷ lệ Tốt</th>
+                <th>HTT</th>
+                <th>HT</th>
+                <th>Tổng</th>
+                <th>Tỷ lệ HTT</th>
               </tr>
             </thead>
             <tbody id="rankBody"></tbody>
@@ -129,18 +147,17 @@
         </div>
       </div>
 
-      <!-- Thống kê theo học sinh -->
       <div class="card" style="margin-top:20px">
         <h2>Thống kê theo học sinh</h2>
-        <div class="toolbar" style="margin-bottom:14px">
+        <div class="toolbar" style="margin-bottom:14px;flex-wrap:wrap">
           <label>Lớp
             <select id="statsClass"></select>
           </label>
           <label>Học kỳ
             <select id="statsStudentSemester">
               <option value="">Cả năm</option>
-              <option value="1">Học kỳ 1 (Tuần 1–18)</option>
-              <option value="2">Học kỳ 2 (Tuần 19–35)</option>
+              <option value="1">Học kỳ 1</option>
+              <option value="2">Học kỳ 2</option>
             </select>
           </label>
           <label>Môn học
@@ -154,25 +171,22 @@
           <button id="loadStudentStats" class="primary">Xem thống kê</button>
         </div>
 
-        <!-- Danh sách học sinh (khi chưa nhập tên hoặc tìm nhiều) -->
         <div id="studentListBox" class="table-wrap" style="margin-bottom:16px;display:none">
           <table>
             <thead>
               <tr>
                 <th>Họ và tên</th>
                 <th>Mã HS</th>
-                <th>Tốt</th>
-                <th>Hoàn thành</th>
-                <th>Cần cố gắng</th>
-                <th>% Tốt</th>
-                <th style="width:120px">Thao tác</th>
+                <th>HTT</th>
+                <th>HT</th>
+                <th>Tổng</th>
+                <th>% HTT</th>
               </tr>
             </thead>
             <tbody id="statsStudentList"></tbody>
           </table>
         </div>
 
-        <!-- Chi tiết 1 học sinh -->
         <div id="studentStatsInfo" style="display:none">
           <h3 id="statsStudentNameTitle" style="margin-bottom:12px;font-size:16px"></h3>
           <div class="stats-grid" id="statsSummary"></div>
@@ -180,17 +194,37 @@
             <table>
               <thead>
                 <tr>
-                  <th>Tuần</th>
+                  <th>Học kỳ</th>
+                  <th>Lần</th>
                   <th>Môn học</th>
                   <th>Đánh giá</th>
                   <th>Thời gian</th>
-                  <th style="width:100px">Thao tác</th>
                 </tr>
               </thead>
               <tbody id="statsDetailBody"></tbody>
             </table>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB CẤU HÌNH NỘI DUNG ĐÁNH GIÁ ==================== -->
+    <section id="config" class="panel" hidden>
+      <div class="card">
+        <h2>Cấu hình nội dung đánh giá theo môn học</h2>
+        <p class="hint" style="margin-bottom:14px">
+          Đặt nhãn / nội dung cho từng lần đánh giá (1–6) của từng môn.
+          Ví dụ: Lần 1 = Kiểm tra miệng, Lần 2 = Bài tập về nhà...
+        </p>
+        <div class="toolbar" style="margin-bottom:16px">
+          <label>Chọn môn học
+            <select id="configSubject"></select>
+          </label>
+          <button id="loadConfigBtn" class="primary">Tải cấu hình</button>
+          <button id="saveConfigBtn" class="primary">Lưu cấu hình</button>
+        </div>
+        <div id="configSlots" class="config-slots"></div>
+        <div id="configMsg" class="message"></div>
       </div>
     </section>
 
@@ -206,11 +240,6 @@
           <h2>Thêm môn học</h2>
           <input name="name" placeholder="Ví dụ: Tin học" required>
           <button class="primary">Thêm môn</button>
-        </form>
-        <form id="weekForm" class="card">
-          <h2>Thêm tuần</h2>
-          <input name="name" placeholder="Ví dụ: Tuần 12" required>
-          <button class="primary">Thêm tuần</button>
         </form>
         <form id="uploadForm" class="card">
           <h2>Nạp danh sách học sinh</h2>
@@ -237,14 +266,6 @@
         <table>
           <thead><tr><th>Tên môn</th><th style="width:140px">Thao tác</th></tr></thead>
           <tbody id="subjectList"></tbody>
-        </table>
-      </div>
-
-      <div class="section-title">Danh sách tuần</div>
-      <div class="table-wrap card" style="padding:0">
-        <table>
-          <thead><tr><th>Tên tuần</th><th style="width:140px">Thao tác</th></tr></thead>
-          <tbody id="weekList"></tbody>
         </table>
       </div>
 
@@ -282,8 +303,8 @@
           <label>Học kỳ
             <select id="clearSemester">
               <option value="">Cả năm</option>
-              <option value="1">Học kỳ 1 (Tuần 1–18)</option>
-              <option value="2">Học kỳ 2 (Tuần 19–35)</option>
+              <option value="1">Học kỳ 1</option>
+              <option value="2">Học kỳ 2</option>
             </select>
           </label>
           <label>Môn học
@@ -291,13 +312,11 @@
               <option value="">Tất cả môn</option>
             </select>
           </label>
-          <button id="btnClearAssessments" class="primary" style="background:#b91c1c">Xóa dữ liệu đánh giá</button>
+          <button id="clearAssessmentsBtn" class="danger">Xóa đánh giá</button>
         </div>
       </div>
     </section>
   </main>
-
-  <footer>Đánh giá thường xuyên · By Lê Hoàng Huy</footer>
 </div>
 
 <div id="toast" class="toast"></div>
