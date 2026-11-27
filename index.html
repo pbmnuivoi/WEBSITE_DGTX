@@ -98,8 +98,13 @@
     <!-- ==================== TAB THỐNG KÊ ==================== -->
     <section id="stats" class="panel" hidden>
       <div class="card">
-        <h2>Top lớp / Thống kê</h2>
+        <h2>Top học sinh trong lớp</h2>
         <div class="toolbar" style="margin-bottom:14px;flex-wrap:wrap">
+          <label>Lớp
+            <select id="statsClassFilter">
+              <option value="">— Chọn lớp —</option>
+            </select>
+          </label>
           <label>Học kỳ
             <select id="statsSemester">
               <option value="">Cả năm</option>
@@ -112,12 +117,7 @@
               <option value="">Tất cả môn</option>
             </select>
           </label>
-          <label>Lớp
-            <select id="statsClassFilter">
-              <option value="">Tất cả lớp (xếp hạng lớp)</option>
-            </select>
-          </label>
-          <button id="loadClassRank" class="primary">Xem xếp hạng</button>
+          <button id="loadClassRank" class="primary">Xem top học sinh</button>
         </div>
         <div id="classRankSummary" class="stats-grid"></div>
         <div class="table-wrap">
@@ -125,11 +125,11 @@
             <thead>
               <tr>
                 <th>Hạng</th>
-                <th>Lớp</th>
+                <th>Họ và tên</th>
                 <th>HTT</th>
                 <th>HT</th>
-                <th>Tổng</th>
-                <th>Tỷ lệ HTT</th>
+                <th>Tổng sao</th>
+                <th>% HTT</th>
               </tr>
             </thead>
             <tbody id="rankBody"></tbody>
@@ -166,7 +166,6 @@
             <thead>
               <tr>
                 <th>Họ và tên</th>
-                <th>Mã HS</th>
                 <th>HTT</th>
                 <th>HT</th>
                 <th>Tổng</th>
