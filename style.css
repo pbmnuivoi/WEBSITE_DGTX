@@ -321,20 +321,25 @@ footer {
 
 /* ========== NEW EVAL STARS (HTT / HT) ========== */
 .htt-header {
-  background: #fef9c3 !important;
-  color: #a16207 !important;
+  background: #ecfdf5 !important;
+  color: #047857 !important;
   text-align: center;
+  font-weight: 700;
 }
 .ht-header {
-  background: #f1f5f9 !important;
-  color: #475569 !important;
+  background: #f0fdf4 !important;
+  color: #166534 !important;
   text-align: center;
+  font-weight: 700;
 }
 .slot-h {
   text-align: center;
-  min-width: 36px;
+  min-width: 38px;
   font-size: 12px;
+  font-weight: 600;
 }
+.htt-slot { background: #ecfdf5 !important; color: #047857; }
+.ht-slot  { background: #f0fdf4 !important; color: #166534; }
 .star-cell {
   text-align: center;
   padding: 6px 4px !important;
