@@ -115,7 +115,7 @@ function fillSelects() {
   fill("statsSubject", meta.subjects, "Tất cả môn");
   fill("statsStudentSubject", meta.subjects, "Tất cả môn");
   fill("statsClass", meta.classes, "— Chọn lớp —");
-  fill("statsClassFilter", meta.classes, "Tất cả lớp (xếp hạng lớp)");
+  fill("statsClassFilter", meta.classes, "— Chọn lớp —");
   fill("uploadClass", meta.classes, "— Chọn lớp —");
   fill("manageStudentClass", meta.classes, "— Chọn lớp —");
   fill("clearClass", meta.classes, "Tất cả lớp");
@@ -370,101 +370,184 @@ if ($("printBtn")) $("printBtn").onclick = async () => {
 
 function openPrintWindow(data) {
   const { className, semester, students, subjects, configs, assessments } = data;
-  const slotCount = currentSlotCount;
+  const slotCount = 6;
+  const yearLabel = "NĂM HỌC 2026 - 2027";
+  const hkLabel = semester ? `Học kỳ ${semester}` : "Cả năm";
 
-  // build config map subjectId_slot → content
-  const confMap = {};
-  (configs || []).forEach(c => {
-    confMap[`${c.subjectId}_${c.slot}`] = c.content;
-  });
+  // Max stars = subjects * 6 * 2 (HTT + HT) but we count only filled stars
+  // In sample: "SỐ SAO đạt / tối đa" e.g. 8/36 — 36 = 3 subjects * 12
+  const maxStars = (subjects.length || 1) * slotCount * 2;
 
   let html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
-    <title>Phiếu đánh giá – ${escapeHtml(className)} – HK${semester}</title>
-    <style>
-      body { font-family: "Times New Roman", serif; font-size: 12px; margin: 16px; }
-      h2, h3 { text-align: center; margin: 6px 0; }
-      table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
-      th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
-      th { background: #f0f0f0; }
-      .name { text-align: left; min-width: 140px; }
-      .star { color: #ca8a04; font-size: 14px; }
-      .muted { color: #999; }
-      @media print { .no-print { display: none; } }
-    </style></head><body>
-    <div class="no-print" style="margin-bottom:12px">
-      <button onclick="window.print()">In ngay</button>
-      <button onclick="window.close()">Đóng</button>
-    </div>
-    <h2>BẢNG ĐÁNH GIÁ HỌC TẬP</h2>
-    <h3>Lớp: ${escapeHtml(className)} &nbsp;|&nbsp; Học kỳ: ${semester}</h3>`;
+<title>Bảng tổng hợp đánh giá – ${escapeHtml(className)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Times New Roman", Times, serif; font-size: 11px; margin: 12px; color: #000; }
+  h1 { text-align: center; font-size: 16px; margin: 4px 0; text-transform: uppercase; }
+  h2 { text-align: center; font-size: 13px; margin: 2px 0 10px; font-weight: normal; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #222; padding: 3px 2px; text-align: center; vertical-align: middle; }
+  th { background: #f5f5f5; font-size: 10px; }
+  .name { text-align: left; padding-left: 6px; white-space: nowrap; min-width: 120px; }
+  .sub-htt { background: #fff8e1; }
+  .sub-ht { background: #e8f5e9; }
+  .star { font-size: 12px; }
+  .footer { margin-top: 18px; display: flex; justify-content: space-between; font-size: 11px; }
+  .sign { text-align: center; min-width: 160px; }
+  .note { font-size: 10px; margin-top: 8px; color: #333; }
+  @media print {
+    .no-print { display: none !important; }
+    body { margin: 6mm; }
+  }
+</style></head><body>
+<div class="no-print" style="margin-bottom:10px">
+  <button onclick="window.print()" style="padding:8px 16px;cursor:pointer">In ngay</button>
+  <button onclick="window.close()" style="padding:8px 16px;cursor:pointer;margin-left:8px">Đóng</button>
+</div>
+<h1>BẢNG TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ GIÁO DỤC</h1>
+<h2>${yearLabel}<br>Lớp: ${escapeHtml(className)}${semester ? " · " + hkLabel : ""}</h2>
+<table>
+<thead>
+<tr>
+  <th rowspan="3">STT</th>
+  <th rowspan="3" class="name">HỌ VÀ TÊN HỌC SINH</th>
+  <th rowspan="3">SỐ SAO<br>đạt / tối đa</th>`;
 
+  // Subject group headers
   subjects.forEach(sub => {
-    html += `<h3 style="margin-top:20px">Môn: ${escapeHtml(sub.name)}</h3>
-      <table><thead><tr>
-        <th>STT</th><th class="name">Họ và tên</th><th>Mã HS</th>`;
-    for (let i = 1; i <= slotCount; i++) {
-      const label = confMap[`${sub.id}_${i}`] || `Lần ${i}`;
-      html += `<th colspan="2">${escapeHtml(label)}<br><small>HTT / HT</small></th>`;
-    }
-    html += `</tr></thead><tbody>`;
+    html += `<th colspan="12" class="sub-htt">${escapeHtml(sub.name)}</th>`;
+  });
+  html += `</tr><tr>`;
+  subjects.forEach(() => {
+    html += `<th colspan="6" class="sub-htt">Đánh giá HTT</th>`;
+    html += `<th colspan="6" class="sub-ht">Đánh giá HT</th>`;
+  });
+  html += `</tr><tr>`;
+  subjects.forEach(() => {
+    for (let i = 1; i <= 6; i++) html += `<th class="sub-htt">${i}</th>`;
+    for (let i = 1; i <= 6; i++) html += `<th class="sub-ht">${i}</th>`;
+  });
+  html += `</tr></thead><tbody>`;
 
-    students.forEach((s, idx) => {
-      html += `<tr>
-        <td>${idx + 1}</td>
-        <td class="name">${escapeHtml(s.name)}</td>
-        <td>${escapeHtml(s.code || "")}</td>`;
-      for (let slot = 1; slot <= slotCount; slot++) {
+  students.forEach((s, idx) => {
+    let starCount = 0;
+    let cells = "";
+    subjects.forEach(sub => {
+      // HTT 1-6
+      for (let slot = 1; slot <= 6; slot++) {
         const key = `${s.id}_${sub.id}_${slot}`;
         const t = assessments[key] || "";
-        const htt = t === "HTT" ? '<span class="star">★</span>' : '<span class="muted">☆</span>';
-        const ht = t === "HT" ? '<span class="star">★</span>' : (t === "HTT" ? '—' : '<span class="muted">☆</span>');
-        html += `<td>${htt}</td><td>${ht}</td>`;
+        if (t === "HTT") {
+          cells += `<td class="sub-htt"><span class="star">★</span></td>`;
+          starCount++;
+        } else {
+          cells += `<td class="sub-htt"></td>`;
+        }
       }
-      html += `</tr>`;
+      // HT 1-6
+      for (let slot = 1; slot <= 6; slot++) {
+        const key = `${s.id}_${sub.id}_${slot}`;
+        const t = assessments[key] || "";
+        if (t === "HT") {
+          cells += `<td class="sub-ht"><span class="star">★</span></td>`;
+          starCount++;
+        } else {
+          cells += `<td class="sub-ht"></td>`;
+        }
+      }
     });
-    html += `</tbody></table>`;
+    html += `<tr>
+      <td>${idx + 1}</td>
+      <td class="name">${escapeHtml(s.name)}</td>
+      <td>${starCount}/${maxStars}</td>
+      ${cells}
+    </tr>`;
   });
 
-  html += `</body></html>`;
+  const subNames = subjects.map(s => s.name).join(", ");
+  html += `</tbody></table>
+<p class="note">Ký hiệu: ★ = đã đánh giá mức tương ứng. Môn in: ${escapeHtml(subNames)}. Bảng được in theo lớp đang chọn.</p>
+<div class="footer">
+  <div></div>
+  <div class="sign">
+    <div>GIÁO VIÊN</div>
+    <div style="margin-top:48px">...............................</div>
+  </div>
+</div>
+</body></html>`;
+
   const w = window.open("", "_blank");
+  if (!w) {
+    toast("Trình duyệt chặn popup — hãy cho phép popup để in");
+    return;
+  }
   w.document.write(html);
   w.document.close();
 }
 
 // ==================== STATS ====================
 if ($("loadClassRank")) $("loadClassRank").onclick = async () => {
+  const classId = $("statsClassFilter")?.value || "";
+  if (!classId) {
+    toast("Vui lòng chọn lớp để xem top học sinh");
+    return;
+  }
   try {
+    // Dùng mode student để lấy danh sách HS trong lớp + số sao
     const r = await api("stats", {
-      mode: "class",
+      mode: "student",
+      classId,
       semester: $("statsSemester")?.value || "",
       subjectId: $("statsSubject")?.value || "",
-      classId: $("statsClassFilter")?.value || ""
+      name: ""
     });
+
+    const list = (r.list || []).slice().sort((a, b) => {
+      // Ưu tiên nhiều HTT, rồi tổng sao
+      const ag = a.good ?? a.summary?.good ?? 0;
+      const bg = b.good ?? b.summary?.good ?? 0;
+      const at = a.total ?? a.summary?.total ?? 0;
+      const bt = b.total ?? b.summary?.total ?? 0;
+      return bg - ag || bt - at;
+    });
+
+    const totalGood = list.reduce((s, x) => s + (x.good ?? x.summary?.good ?? 0), 0);
+    const totalHt = list.reduce((s, x) => s + (x.complete ?? x.summary?.complete ?? 0), 0);
+    const totalAll = list.reduce((s, x) => s + (x.total ?? x.summary?.total ?? 0), 0);
+
     const sum = $("classRankSummary");
-    sum.innerHTML = "";
-    [["HTT", r.total?.good || 0], ["HT", r.total?.complete || 0], ["Tổng", r.total?.total || 0]].forEach(([label, val]) => {
-      const d = document.createElement("div");
-      d.className = "stat-card";
-      d.innerHTML = `<b>${val}</b><span>${label}</span>`;
-      sum.appendChild(d);
-    });
+    if (sum) {
+      sum.innerHTML = "";
+      [["HTT", totalGood], ["HT", totalHt], ["Tổng sao", totalAll], ["Số HS", list.length]].forEach(([label, val]) => {
+        const d = document.createElement("div");
+        d.className = "stat-card";
+        d.innerHTML = `<b>${val}</b><span>${label}</span>`;
+        sum.appendChild(d);
+      });
+    }
 
     const body = $("rankBody");
     body.innerHTML = "";
-    (r.ranking || []).forEach((item, i) => {
+    if (!list.length) {
+      body.innerHTML = `<tr><td colspan="6" class="empty">Chưa có dữ liệu đánh giá trong lớp này</td></tr>`;
+      return;
+    }
+    list.forEach((item, i) => {
+      const name = item.student?.name || item.name || "";
+      const good = item.good ?? item.summary?.good ?? 0;
+      const complete = item.complete ?? item.summary?.complete ?? 0;
+      const total = item.total ?? item.summary?.total ?? 0;
+      const rate = total ? Math.round((good / total) * 1000) / 10 : 0;
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${i + 1}</td>
-        <td>${escapeHtml(item.className)}</td>
-        <td>${item.good}</td>
-        <td>${item.complete}</td>
-        <td>${item.total}</td>
-        <td>${item.goodRate}%</td>`;
+        <td>${escapeHtml(name)}</td>
+        <td>${good}</td>
+        <td>${complete}</td>
+        <td>${total}</td>
+        <td>${rate}%</td>`;
       body.appendChild(tr);
     });
-    if (!(r.ranking || []).length) {
-      body.innerHTML = `<tr><td colspan="6" class="empty">Chưa có dữ liệu</td></tr>`;
-    }
   } catch (e) {
     toast(e.message);
   }
@@ -496,7 +579,6 @@ if ($("loadStudentStats")) $("loadStudentStats").onclick = async () => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${escapeHtml(item.student.name)}</td>
-          <td>${escapeHtml(item.student.code || "")}</td>
           <td>${item.good}</td>
           <td>${item.complete}</td>
           <td>${item.total}</td>
