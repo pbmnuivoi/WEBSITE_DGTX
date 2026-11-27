@@ -557,3 +557,32 @@ header {
 }
 header b { font-size: 15px; }
 header small { display: block; color: var(--muted); font-size: 12px; }
+
+
+/* Sticky STT + Tên học sinh khi kéo ngang (điện thoại) */
+#evalTable th:nth-child(1),
+#evalTable td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #fff;
+  min-width: 40px;
+}
+#evalTable th:nth-child(2),
+#evalTable td:nth-child(2) {
+  position: sticky;
+  left: 40px;
+  z-index: 3;
+  background: #fff;
+  min-width: 140px;
+  box-shadow: 2px 0 4px rgba(0,0,0,.06);
+}
+#evalTable thead th:nth-child(1),
+#evalTable thead th:nth-child(2) {
+  z-index: 4;
+  background: #f1f5f9;
+}
+#evalTable tr:hover td:nth-child(1),
+#evalTable tr:hover td:nth-child(2) {
+  background: #f8fafc;
+}
