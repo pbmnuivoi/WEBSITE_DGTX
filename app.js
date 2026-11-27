@@ -843,16 +843,67 @@ if ($("uploadForm")) $("uploadForm").onsubmit = async e => {
 
 async function parseStudentFile(file) {
   const data = await file.arrayBuffer();
-  const wb = XLSX.read(data);
+  const wb = XLSX.read(data, { cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  const norm = value => String(value ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d").replace(/Đ/g, "D")
+    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  // Tìm dòng tiêu đề thật; file bảng điểm thường có nhiều dòng tên trường,
+  // tên bảng, lớp và mã biểu mẫu ở phía trên.
+  let headerIndex = -1;
+  let codeCol = -1;
+  let nameCol = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const cells = rows[i].map(norm);
+    const c = cells.findIndex(v => v === "ma hoc sinh" || v.includes("ma hoc sinh"));
+    const n = cells.findIndex(v => v === "ho va ten" || v.includes("ho va ten"));
+    if (c >= 0 && n >= 0) {
+      headerIndex = i;
+      codeCol = c;
+      nameCol = n;
+      break;
+    }
+  }
+
   const list = [];
-  rows.forEach((row, i) => {
-    if (i === 0) return; // skip header
-    const name = String(row[1] || row[0] || "").trim();
-    const code = String(row[2] || row[0] || "").trim();
-    if (name && name.length > 1) list.push({ name, code });
-  });
+  if (headerIndex >= 0) {
+    // Họ tên có thể được tách thành nhiều cột (ví dụ C và D),
+    // trong khi ô tiêu đề "Họ và tên" được gộp. Ghép các cột đó lại.
+    let nameEnd = rows[headerIndex].length;
+    for (let c = nameCol + 1; c < rows[headerIndex].length; c++) {
+      if (String(rows[headerIndex][c] ?? "").trim()) {
+        nameEnd = c;
+        break;
+      }
+    }
+    for (let i = headerIndex + 1; i < rows.length; i++) {
+      const row = rows[i] || [];
+      const code = String(row[codeCol] ?? "").trim();
+      const name = row.slice(nameCol, nameEnd)
+        .map(v => String(v ?? "").trim())
+        .filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+      // Chỉ nhận dòng có cả mã học sinh và họ tên, bỏ qua dòng tiêu đề/phụ chú.
+      if (code && name && name.length > 1) list.push({ name, code });
+    }
+  } else {
+    // Tương thích với file danh sách đơn giản: cột A là mã, cột B là họ tên
+    // hoặc cột A là họ tên, cột B là mã.
+    for (const row of rows) {
+      if (!row || row.length < 2) continue;
+      const a = String(row[0] ?? "").trim();
+      const b = String(row[1] ?? "").trim();
+      const aIsCode = /^\d{6,}$/.test(a);
+      const bIsCode = /^\d{6,}$/.test(b);
+      if (aIsCode && b && !bIsCode) list.push({ name: b, code: a });
+      else if (bIsCode && a && !aIsCode) list.push({ name: a, code: b });
+    }
+  }
+  if (!list.length) {
+    throw new Error("Không tìm thấy danh sách học sinh hợp lệ. Vui lòng kiểm tra cột Mã học sinh và Họ và tên trong file.");
+  }
   return list;
 }
 
