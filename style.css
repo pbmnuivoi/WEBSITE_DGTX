@@ -616,3 +616,11 @@ header small { display: block; color: var(--muted); font-size: 12px; }
   color: #166534;
 }
 
+
+/* Làm nổi bật ba vị trí dẫn đầu bảng xếp hạng */
+#rankBody tr.rank-top-1 { background: #fff1b8; font-weight: 700; }
+#rankBody tr.rank-top-2 { background: #edf0f4; font-weight: 700; }
+#rankBody tr.rank-top-3 { background: #f8e4d2; font-weight: 700; }
+#rankBody tr.rank-top-1 td:first-child { color: #9a6700; font-size: 18px; }
+#rankBody tr.rank-top-2 td:first-child { color: #526171; font-size: 17px; }
+#rankBody tr.rank-top-3 td:first-child { color: #9a5728; font-size: 17px; }
