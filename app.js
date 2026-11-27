@@ -246,31 +246,23 @@ function renderEvalBody() {
     // HTT stars — ẩn nếu đã chọn HT cùng lần
     for (let slot = 1; slot <= currentSlotCount; slot++) {
       const val = as[String(slot)];
-      if (val === "HT") {
-        html += `<td class="star-cell muted-cell">—</td>`;
-      } else {
-        const active = val === "HTT";
-        html += `<td class="star-cell">
-          <button type="button" class="star-btn htt ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HTT" title="Hoàn thành tốt - Lần ${slot}">
-            ${active ? "★" : "☆"}
-          </button>
-        </td>`;
-      }
+      const active = val === "HTT";
+      html += `<td class="star-cell">
+        <button type="button" class="star-btn htt ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HTT" title="Hoàn thành tốt - Lần ${slot}">
+          ${active ? "★" : "☆"}
+        </button>
+      </td>`;
     }
 
     // HT stars — ẩn nếu đã chọn HTT cùng lần
     for (let slot = 1; slot <= currentSlotCount; slot++) {
       const val = as[String(slot)];
-      if (val === "HTT") {
-        html += `<td class="star-cell muted-cell">—</td>`;
-      } else {
-        const active = val === "HT";
-        html += `<td class="star-cell">
-          <button type="button" class="star-btn ht ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HT" title="Hoàn thành - Lần ${slot}">
-            ${active ? "★" : "☆"}
-          </button>
-        </td>`;
-      }
+      const active = val === "HT";
+      html += `<td class="star-cell">
+        <button type="button" class="star-btn ht ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HT" title="Hoàn thành - Lần ${slot}">
+          ${active ? "🌸" : "✿"}
+        </button>
+      </td>`;
     }
 
     tr.innerHTML = html;
@@ -381,10 +373,13 @@ function openPrintWindow(data) {
   body { font-family: "Times New Roman", Times, serif; font-size: 11px; margin: 12px; color: #000; }
   h1 { text-align: center; font-size: 16px; margin: 4px 0; text-transform: uppercase; }
   h2 { text-align: center; font-size: 13px; margin: 2px 0 10px; font-weight: normal; }
-  table { border-collapse: collapse; width: 100%; }
+  @page { size: landscape; margin: 8mm; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
   th, td { border: 1px solid #222; padding: 3px 2px; text-align: center; vertical-align: middle; }
   th { background: #f5f5f5; font-size: 10px; }
-  .name { text-align: left; padding-left: 6px; white-space: nowrap; min-width: 120px; }
+  .name { text-align: left; padding-left: 6px; white-space: nowrap; overflow: hidden; }
+  th, td { padding: 2px 1px; overflow: hidden; }
+  .star { font-size: 11px; line-height: 1; display: inline-block; width: 100%; }
   /* Chỉ tô màu hàng tiêu đề tên môn để phân biệt các môn */
   .subject-band-0 { background: #fff1c2; }
   .subject-band-1 { background: #dff3e4; }
@@ -407,6 +402,11 @@ function openPrintWindow(data) {
 <h1>BẢNG TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ GIÁO DỤC</h1>
 <h2>${yearLabel}<br>Lớp: ${escapeHtml(className)}${semester ? " · " + hkLabel : ""}</h2>
 <table>
+<colgroup>
+  <col style="width:3%">
+  <col style="width:17%">
+  ${subjects.map(() => Array.from({length:12}, () => '<col style="width:' + (80 / (subjects.length * 12)) + '%">').join("")).join("")}
+</colgroup>
 <thead>
 <tr>
   <th rowspan="3">STT</th>
@@ -448,7 +448,7 @@ function openPrintWindow(data) {
         const key = `${s.id}_${sub.id}_${slot}`;
         const t = assessments[key] || "";
         if (t === "HT") {
-          cells += `<td><span class="star">★</span></td>`;
+          cells += `<td><span class="star">🌸</span></td>`;
         } else {
           cells += `<td></td>`;
         }
@@ -463,7 +463,7 @@ function openPrintWindow(data) {
 
   const subNames = subjects.map(s => s.name).join(", ");
   html += `</tbody></table>
-<p class="note">Ký hiệu: ★ = đã đánh giá mức tương ứng. Môn in: ${escapeHtml(subNames)}. Bảng được in theo lớp đang chọn.</p>
+<p class="note">Ký hiệu: ★ = Hoàn thành tốt (HTT); 🌸 = Hoàn thành (HT). Môn in: ${escapeHtml(subNames)}. Bảng được in theo lớp đang chọn.</p>
 <div class="footer">
   <div></div>
   <div class="sign">
