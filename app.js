@@ -189,10 +189,10 @@ async function renderEvalTable() {
     return;
   }
 
-  // Header giống mẫu ảnh: STT | Học sinh | Đánh giá HTT 1-6 | Đánh giá HT 1-6
+  // Header: STT | Học sinh (sticky) | HTT 1-6 | HT 1-6
   let h = `<tr>
-    <th rowspan="2" style="min-width:44px;vertical-align:middle">STT</th>
-    <th rowspan="2" style="min-width:180px;vertical-align:middle">Học sinh</th>
+    <th rowspan="2" class="col-stt">STT</th>
+    <th rowspan="2" class="col-name">Học sinh</th>
     <th colspan="${currentSlotCount}" class="htt-header">Đánh giá HTT</th>
     <th colspan="${currentSlotCount}" class="ht-header">Đánh giá HT</th>
   </tr>
@@ -239,9 +239,9 @@ function renderEvalBody() {
     const tr = document.createElement("tr");
     const as = assessments[s.id] || {};
 
-    // STT + tên (không hiện mã HS)
-    let html = `<td class="center">${idx + 1}</td>
-      <td><strong>${escapeHtml(s.name)}</strong></td>`;
+    // STT + tên sticky (không hiện mã HS)
+    let html = `<td class="col-stt center">${idx + 1}</td>
+      <td class="col-name"><strong>${escapeHtml(s.name)}</strong></td>`;
 
     // HTT stars — ẩn nếu đã chọn HT cùng lần
     for (let slot = 1; slot <= currentSlotCount; slot++) {
@@ -391,7 +391,16 @@ function openPrintWindow(data) {
   .name { text-align: left; padding-left: 6px; white-space: nowrap; min-width: 120px; }
   .sub-htt { background: #fff8e1; }
   .sub-ht { background: #e8f5e9; }
-  .star { font-size: 12px; }
+  .c0-htt { background: #fff3cd; } /* vàng nhạt - HTT */
+  .c0-ht  { background: #ffeeba; }
+  .c1-htt { background: #d4edda; } /* xanh lá - HTT */
+  .c1-ht  { background: #c3e6cb; }
+  .c2-htt { background: #d1ecf1; } /* xanh dương - HTT */
+  .c2-ht  { background: #bee5eb; }
+  .c3-htt { background: #f8d7da; }
+  .c3-ht  { background: #f5c6cb; }
+  .star { font-size: 13px; color: #000; }
+  .num { font-weight: 600; white-space: nowrap; }
   .footer { margin-top: 18px; display: flex; justify-content: space-between; font-size: 11px; }
   .sign { text-align: center; min-width: 160px; }
   .note { font-size: 10px; margin-top: 8px; color: #333; }
@@ -413,35 +422,39 @@ function openPrintWindow(data) {
   <th rowspan="3" class="name">HỌ VÀ TÊN HỌC SINH</th>
   <th rowspan="3">SỐ SAO<br>đạt / tối đa</th>`;
 
-  // Subject group headers
-  subjects.forEach(sub => {
-    html += `<th colspan="12" class="sub-htt">${escapeHtml(sub.name)}</th>`;
+  // Subject group headers — màu theo từng môn (giống mẫu)
+  subjects.forEach((sub, si) => {
+    const c = si % 4;
+    html += `<th colspan="12" class="c${c}-htt">${escapeHtml(sub.name)}</th>`;
   });
   html += `</tr><tr>`;
-  subjects.forEach(() => {
-    html += `<th colspan="6" class="sub-htt">Đánh giá HTT</th>`;
-    html += `<th colspan="6" class="sub-ht">Đánh giá HT</th>`;
+  subjects.forEach((sub, si) => {
+    const c = si % 4;
+    html += `<th colspan="6" class="c${c}-htt">Đánh giá HTT</th>`;
+    html += `<th colspan="6" class="c${c}-ht">Đánh giá HT</th>`;
   });
   html += `</tr><tr>`;
-  subjects.forEach(() => {
-    for (let i = 1; i <= 6; i++) html += `<th class="sub-htt">${i}</th>`;
-    for (let i = 1; i <= 6; i++) html += `<th class="sub-ht">${i}</th>`;
+  subjects.forEach((sub, si) => {
+    const c = si % 4;
+    for (let i = 1; i <= 6; i++) html += `<th class="c${c}-htt">${i}</th>`;
+    for (let i = 1; i <= 6; i++) html += `<th class="c${c}-ht">${i}</th>`;
   });
   html += `</tr></thead><tbody>`;
 
   students.forEach((s, idx) => {
     let starCount = 0;
     let cells = "";
-    subjects.forEach(sub => {
+    subjects.forEach((sub, si) => {
+      const c = si % 4;
       // HTT 1-6
       for (let slot = 1; slot <= 6; slot++) {
         const key = `${s.id}_${sub.id}_${slot}`;
         const t = assessments[key] || "";
         if (t === "HTT") {
-          cells += `<td class="sub-htt"><span class="star">★</span></td>`;
+          cells += `<td class="c${c}-htt"><span class="star">★</span></td>`;
           starCount++;
         } else {
-          cells += `<td class="sub-htt"></td>`;
+          cells += `<td class="c${c}-htt"></td>`;
         }
       }
       // HT 1-6
@@ -449,17 +462,17 @@ function openPrintWindow(data) {
         const key = `${s.id}_${sub.id}_${slot}`;
         const t = assessments[key] || "";
         if (t === "HT") {
-          cells += `<td class="sub-ht"><span class="star">★</span></td>`;
+          cells += `<td class="c${c}-ht"><span class="star">★</span></td>`;
           starCount++;
         } else {
-          cells += `<td class="sub-ht"></td>`;
+          cells += `<td class="c${c}-ht"></td>`;
         }
       }
     });
     html += `<tr>
       <td>${idx + 1}</td>
       <td class="name">${escapeHtml(s.name)}</td>
-      <td>${starCount}/${maxStars}</td>
+      <td class="num">${starCount}/${maxStars}</td>
       ${cells}
     </tr>`;
   });
@@ -526,26 +539,36 @@ if ($("loadClassRank")) $("loadClassRank").onclick = async () => {
       });
     }
 
-    const body = $("rankBody");
-    body.innerHTML = "";
-    if (!list.length) {
-      body.innerHTML = `<tr><td colspan="6" class="empty">Chưa có dữ liệu đánh giá trong lớp này</td></tr>`;
-      return;
-    }
-    list.forEach((item, i) => {
-      const name = item.student?.name || item.name || "";
+    // Chuẩn hoá list từ student-list hoặc student-detail
+    let normalized = list.map(item => {
+      const st = item.student || item;
       const good = item.good ?? item.summary?.good ?? 0;
       const complete = item.complete ?? item.summary?.complete ?? 0;
       const total = item.total ?? item.summary?.total ?? 0;
-      const rate = total ? Math.round((good / total) * 1000) / 10 : 0;
+      return {
+        name: st.name || item.name || "",
+        good, complete, total,
+        rate: total ? Math.round((good / total) * 1000) / 10 : 0
+      };
+    }).filter(x => x.name);
+
+    normalized.sort((a, b) => b.good - a.good || b.total - a.total);
+
+    const body = $("rankBody");
+    body.innerHTML = "";
+    if (!normalized.length) {
+      body.innerHTML = `<tr><td colspan="6" class="empty">Chưa có học sinh / chưa có dữ liệu đánh giá trong lớp này</td></tr>`;
+      return;
+    }
+    normalized.forEach((item, i) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${i + 1}</td>
-        <td>${escapeHtml(name)}</td>
-        <td>${good}</td>
-        <td>${complete}</td>
-        <td>${total}</td>
-        <td>${rate}%</td>`;
+        <td>${escapeHtml(item.name)}</td>
+        <td>${item.good}</td>
+        <td>${item.complete}</td>
+        <td>${item.total}</td>
+        <td>${item.rate}%</td>`;
       body.appendChild(tr);
     });
   } catch (e) {
