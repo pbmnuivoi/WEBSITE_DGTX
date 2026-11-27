@@ -363,7 +363,9 @@ if ($("printBtn")) $("printBtn").onclick = async () => {
 function openPrintWindow(data) {
   const { className, semester, students, subjects, configs, assessments } = data;
   const slotCount = 6;
-  const yearLabel = "NĂM HỌC 2026 - 2027";
+  const printHeaderConfig = JSON.parse(localStorage.getItem("dgt_print_header") || "{}");
+  const reportTitle = printHeaderConfig.title || "BẢNG TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ GIÁO DỤC";
+  const yearLabel = "NĂM HỌC " + (printHeaderConfig.schoolYear || "2026 - 2027");
   const hkLabel = semester ? `Học kỳ ${semester}` : "Cả năm";
 
   let html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
@@ -399,7 +401,7 @@ function openPrintWindow(data) {
   <button onclick="window.print()" style="padding:8px 16px;cursor:pointer">In ngay</button>
   <button onclick="window.close()" style="padding:8px 16px;cursor:pointer;margin-left:8px">Đóng</button>
 </div>
-<h1>BẢNG TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ GIÁO DỤC</h1>
+<h1>${escapeHtml(reportTitle)}</h1>
 <h2>${yearLabel}<br>Lớp: ${escapeHtml(className)}${semester ? " · " + hkLabel : ""}</h2>
 <table>
 <colgroup>
@@ -635,6 +637,29 @@ if ($("loadStudentStats")) $("loadStudentStats").onclick = async () => {
     toast(e.message);
   }
 };
+
+// ==================== CẤU HÌNH TIÊU ĐỀ BẢNG IN ====================
+function loadPrintHeaderConfig() {
+  const saved = JSON.parse(localStorage.getItem("dgt_print_header") || "{}");
+  if ($("printReportTitle")) $("printReportTitle").value = saved.title || "BẢNG TỔNG HỢP KẾT QUẢ ĐÁNH GIÁ GIÁO DỤC";
+  if ($("printSchoolYear")) $("printSchoolYear").value = saved.schoolYear || "2026 - 2027";
+}
+
+if ($("savePrintHeaderBtn")) $("savePrintHeaderBtn").onclick = () => {
+  const title = $("printReportTitle").value.trim();
+  const schoolYear = $("printSchoolYear").value.trim();
+  if (!title || !schoolYear) {
+    $("printHeaderMsg").textContent = "Vui lòng nhập đầy đủ tiêu đề và năm học.";
+    $("printHeaderMsg").style.color = "#b91c1c";
+    return;
+  }
+  localStorage.setItem("dgt_print_header", JSON.stringify({ title, schoolYear }));
+  $("printHeaderMsg").textContent = "Đã lưu cấu hình tiêu đề in.";
+  $("printHeaderMsg").style.color = "#15803d";
+  setTimeout(() => { if ($("printHeaderMsg")) $("printHeaderMsg").textContent = ""; }, 2500);
+};
+
+loadPrintHeaderConfig();
 
 // ==================== CONFIG NỘI DUNG ĐÁNH GIÁ ====================
 function loadConfigSlots() {
