@@ -287,12 +287,17 @@ async function toggleStar(btn) {
   const studentId = btn.dataset.sid;
   const slot = Number(btn.dataset.slot);
   const type = btn.dataset.type;
-  const semester = $("semesterSelect").value;
-  const subjectId = $("subjectSelect").value;
-  const classId = $("classSelect").value;
+  const semester = $("semesterSelect")?.value;
+  const subjectId = $("subjectSelect")?.value;
+  const classId = $("classSelect")?.value;
+
+  if (!studentId || !semester || !subjectId || !classId || !slot) {
+    toast("Thiếu thông tin đánh giá");
+    return;
+  }
 
   const current = (assessments[studentId] || {})[String(slot)];
-  // Nếu đang bật đúng loại này → xóa; ngược lại → set loại mới
+  // Bấm lại sao đang chọn → xóa; bấm loại khác → đổi sang loại đó
   const newType = current === type ? "" : type;
 
   btn.disabled = true;
@@ -306,6 +311,7 @@ async function toggleStar(btn) {
       type: newType || "CLEAR"
     });
 
+    // Cập nhật local ngay
     if (!assessments[studentId]) assessments[studentId] = {};
     if (newType) {
       assessments[studentId][String(slot)] = newType;
@@ -313,12 +319,14 @@ async function toggleStar(btn) {
       delete assessments[studentId][String(slot)];
     }
 
-    // Re-render row to update hide logic
+    // Bên còn lại tự mất màu (render lại → hiện —)
     renderEvalBody();
-    $("saveStatus").textContent = newType
-      ? `Đã lưu: ${type} lần ${slot}`
-      : `Đã xóa đánh giá lần ${slot}`;
-    setTimeout(() => ($("saveStatus").textContent = ""), 2000);
+    if ($("saveStatus")) {
+      $("saveStatus").textContent = newType
+        ? `Đã lưu: ${type === "HTT" ? "Hoàn thành tốt" : "Hoàn thành"} · Lần ${slot}`
+        : `Đã xóa đánh giá lần ${slot}`;
+      setTimeout(() => { if ($("saveStatus")) $("saveStatus").textContent = ""; }, 2000);
+    }
   } catch (e) {
     toast(e.message);
   } finally {
