@@ -3,15 +3,10 @@ const API = window.APP_CONFIG?.API_URL || "";
 
 let token = "";
 let me = null;
-let meta = { classes: [], subjects: [], weeks: [] };
+let meta = { classes: [], subjects: [], evalConfig: [] };
 let students = [];
-let assessments = {};
-
-const rating = [
-  { v: "TOT", i: "★", t: "Tốt" },
-  { v: "HT",  i: "✿", t: "Hoàn thành" },
-  { v: "CĐ",  i: "ϟ", t: "Cần cố gắng" }
-];
+let assessments = {}; // studentId -> { "1": "HTT", "2": "HT", ... }
+let currentSlotCount = 6;
 
 function toast(msg) {
   const e = $("toast");
@@ -103,687 +98,681 @@ function fill(id, arr, placeholder) {
     const o = document.createElement("option");
     o.value = "";
     o.textContent = placeholder;
-    el.append(o);
+    el.appendChild(o);
   }
-  (arr || []).forEach(x => {
+  (arr || []).forEach(item => {
     const o = document.createElement("option");
-    o.value = x.id;
-    o.textContent = x.name;
-    el.append(o);
+    o.value = item.id;
+    o.textContent = item.name;
+    el.appendChild(o);
   });
-  if ([...el.options].some(o => o.value === old)) el.value = old;
+  if (old && [...el.options].some(o => o.value === old)) el.value = old;
 }
 
 function fillSelects() {
-  fill("weekSelect", meta.weeks);
-  fill("subjectSelect", meta.subjects, "Chọn môn");
-  fill("classSelect", meta.classes, "Chọn lớp");
-
-  fill("statsWeek", meta.weeks, "Tất cả tuần");
+  fill("subjectSelect", meta.subjects, "— Chọn môn —");
+  fill("classSelect", meta.classes, "— Chọn lớp —");
   fill("statsSubject", meta.subjects, "Tất cả môn");
-  fill("statsClassFilter", meta.classes, "Tất cả lớp");
-
-  fill("statsClass", meta.classes, "Chọn lớp");
   fill("statsStudentSubject", meta.subjects, "Tất cả môn");
-
-  fill("uploadClass", meta.classes, "Chọn lớp");
-  fill("manageStudentClass", meta.classes, "Chọn lớp");
+  fill("statsClass", meta.classes, "— Chọn lớp —");
+  fill("statsClassFilter", meta.classes, "Tất cả lớp (xếp hạng lớp)");
+  fill("uploadClass", meta.classes, "— Chọn lớp —");
+  fill("manageStudentClass", meta.classes, "— Chọn lớp —");
   fill("clearClass", meta.classes, "Tất cả lớp");
   fill("clearSubject", meta.subjects, "Tất cả môn");
+  fill("configSubject", meta.subjects, "— Chọn môn —");
 
-  // Khôi phục lựa chọn tuần/môn đã lưu
-  const w = localStorage.getItem("dgt_week");
-  const s = localStorage.getItem("dgt_subject");
-  if (w && [...$("weekSelect").options].some(o => o.value === w)) $("weekSelect").value = w;
-  if (s && [...$("subjectSelect").options].some(o => o.value === s)) $("subjectSelect").value = s;
+  // print multi-select
+  const ps = $("printSubjects");
+  if (ps) {
+    ps.innerHTML = "";
+    (meta.subjects || []).forEach(s => {
+      const o = document.createElement("option");
+      o.value = s.id;
+      o.textContent = s.name;
+      ps.appendChild(o);
+    });
+  }
+
+  // restore last choices
+  const sem = localStorage.getItem("dgt_semester");
+  if (sem) $("semesterSelect").value = sem;
+  const sub = localStorage.getItem("dgt_subject");
+  if (sub && [...$("subjectSelect").options].some(o => o.value === sub)) $("subjectSelect").value = sub;
+  const cls = localStorage.getItem("dgt_class");
+  if (cls && [...$("classSelect").options].some(o => o.value === cls)) $("classSelect").value = cls;
+  const sc = localStorage.getItem("dgt_slotCount");
+  if (sc) $("slotCountSelect").value = sc;
+
+  renderEvalTable();
 }
 
 // ==================== TABS ====================
-function showTab(id) {
-  document.querySelectorAll(".panel").forEach(p => p.hidden = p.id !== id);
-  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === id));
-  if (id === "evaluate") loadStudents();
-  if (id === "manage") {
-    renderManageTables();
-    loadStudentManageList();
-  }
-}
 document.querySelectorAll(".tab").forEach(btn => {
   btn.onclick = () => showTab(btn.dataset.tab);
 });
 
-// ==================== ĐÁNH GIÁ (nhanh – theo 1 tuần) ====================
-if ($("weekSelect")) {
-  $("weekSelect").onchange = () => {
-    localStorage.setItem("dgt_week", $("weekSelect").value);
-    loadStudents();
-  };
+function showTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  document.querySelectorAll(".panel").forEach(p => p.hidden = p.id !== name);
+  if (name === "manage") refreshManageLists();
+  if (name === "config") loadConfigSlots();
 }
-if ($("subjectSelect")) {
-  $("subjectSelect").onchange = () => {
-    localStorage.setItem("dgt_subject", $("subjectSelect").value);
-    loadStudents();
-  };
-}
-if ($("classSelect")) $("classSelect").onchange = loadStudents;
-if ($("studentSearch")) $("studentSearch").oninput = renderStudents;
 
-async function loadStudents() {
-  const classId = $("classSelect").value;
-  const weekId = $("weekSelect").value;
+// ==================== EVALUATE ====================
+["semesterSelect", "subjectSelect", "classSelect", "slotCountSelect"].forEach(id => {
+  if ($(id)) {
+    $(id).onchange = () => {
+      localStorage.setItem("dgt_semester", $("semesterSelect").value);
+      localStorage.setItem("dgt_subject", $("subjectSelect").value);
+      localStorage.setItem("dgt_class", $("classSelect").value);
+      localStorage.setItem("dgt_slotCount", $("slotCountSelect").value);
+      renderEvalTable();
+    };
+  }
+});
+
+if ($("studentSearch")) {
+  $("studentSearch").oninput = () => renderEvalBody();
+}
+
+async function renderEvalTable() {
+  currentSlotCount = Number($("slotCountSelect").value) || 6;
+  const semester = $("semesterSelect").value;
   const subjectId = $("subjectSelect").value;
+  const classId = $("classSelect").value;
 
-  if (!classId || !weekId || !subjectId) {
-    $("evalBody").innerHTML = `<tr><td colspan="3" class="empty">Vui lòng chọn đủ Tuần – Môn – Lớp</td></tr>`;
+  const head = $("evalHead");
+  const body = $("evalBody");
+
+  if (!semester || !subjectId || !classId) {
+    head.innerHTML = "";
+    body.innerHTML = `<tr><td colspan="20" class="empty">Chọn Học kỳ – Môn – Lớp để bắt đầu đánh giá</td></tr>`;
+    $("evalInfo").textContent = "";
     return;
   }
 
-  $("evalBody").innerHTML = `<tr><td colspan="3" class="empty">Đang tải...</td></tr>`;
+  // Build header: STT | Học sinh | Đánh giá HTT (1..n) | Đánh giá HT (1..n)
+  let h = `<tr>
+    <th style="min-width:40px">STT</th>
+    <th style="min-width:180px">Học sinh</th>
+    <th colspan="${currentSlotCount}" class="htt-header">Đánh giá HTT</th>
+    <th colspan="${currentSlotCount}" class="ht-header">Đánh giá HT</th>
+  </tr>
+  <tr>
+    <th></th><th></th>`;
+  for (let i = 1; i <= currentSlotCount; i++) h += `<th class="slot-h">${i}</th>`;
+  for (let i = 1; i <= currentSlotCount; i++) h += `<th class="slot-h">${i}</th>`;
+  h += `</tr>`;
+  head.innerHTML = h;
+
+  body.innerHTML = `<tr><td colspan="${2 + currentSlotCount * 2}" class="empty">Đang tải...</td></tr>`;
 
   try {
-    const [stuRes, assRes] = await Promise.all([
+    const [stRes, asRes] = await Promise.all([
       api("students", { classId }),
-      api("getAssessments", { classId, weekId, subjectId })
+      api("getAssessments", { classId, subjectId, semester })
     ]);
-    students = stuRes.students || [];
-    assessments = assRes.assessments || {};
-    renderStudents();
+    students = (stRes.students || []).sort((a, b) => (a.name || "").localeCompare(b.name || "", "vi"));
+    assessments = asRes.assessments || {};
+    const subName = (meta.subjects.find(s => s.id === subjectId) || {}).name || "";
+    $("evalInfo").textContent = `${students.length} HS · ${subName} · Học kỳ ${semester}`;
+    renderEvalBody();
   } catch (e) {
-    $("evalBody").innerHTML = `<tr><td colspan="3" class="empty">${e.message}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="20" class="empty">${e.message}</td></tr>`;
   }
 }
 
-function renderStudents() {
-  const q = ($("studentSearch").value || "").toLocaleLowerCase("vi");
-  const list = students.filter(s => s.name.toLocaleLowerCase("vi").includes(q));
+function renderEvalBody() {
   const body = $("evalBody");
-  body.innerHTML = "";
+  const q = ($("studentSearch").value || "").trim().toLowerCase();
+  const list = q
+    ? students.filter(s =>
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.code || "").toLowerCase().includes(q)
+      )
+    : students;
 
   if (!list.length) {
-    body.innerHTML = `<tr><td colspan="3" class="empty">Không tìm thấy học sinh</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${2 + currentSlotCount * 2}" class="empty">Không tìm thấy học sinh</td></tr>`;
     return;
   }
 
-  list.forEach(s => {
+  body.innerHTML = "";
+  list.forEach((s, idx) => {
     const tr = document.createElement("tr");
+    const as = assessments[s.id] || {};
 
-    const tdName = document.createElement("td");
-    tdName.innerHTML = `<strong>${s.name}</strong>`;
-    tr.append(tdName);
+    // STT + name
+    let html = `<td class="center">${idx + 1}</td>
+      <td>
+        <strong>${escapeHtml(s.name)}</strong>
+        <div class="code">${escapeHtml(s.code || "")}</div>
+      </td>`;
 
-    const tdCode = document.createElement("td");
-    tdCode.textContent = s.code || "";
-    tdCode.style.color = "#64748b";
-    tr.append(tdCode);
+    // HTT stars (1..n)
+    for (let slot = 1; slot <= currentSlotCount; slot++) {
+      const active = as[String(slot)] === "HTT";
+      html += `<td class="star-cell">
+        <button class="star-btn htt ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HTT" title="Hoàn thành tốt - Lần ${slot}">
+          ${active ? "★" : "☆"}
+        </button>
+      </td>`;
+    }
 
-    const tdRate = document.createElement("td");
-    tdRate.style.textAlign = "center";
-    const wrap = document.createElement("div");
-    wrap.style.display = "inline-flex";
-    wrap.style.gap = "6px";
+    // HT stars (1..n) — ẩn nếu đã chọn HTT
+    for (let slot = 1; slot <= currentSlotCount; slot++) {
+      const hasHTT = as[String(slot)] === "HTT";
+      const active = as[String(slot)] === "HT";
+      if (hasHTT) {
+        html += `<td class="star-cell muted-cell">—</td>`;
+      } else {
+        html += `<td class="star-cell">
+          <button class="star-btn ht ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HT" title="Hoàn thành - Lần ${slot}">
+            ${active ? "★" : "☆"}
+          </button>
+        </td>`;
+      }
+    }
 
-    rating.forEach(r => {
-      const btn = document.createElement("button");
-      btn.className = "rate-btn" + (assessments[s.id] === r.v ? ` selected-${r.v}` : "");
-      btn.textContent = r.i;
-      btn.title = r.t;
-      btn.onclick = () => saveRating(s, r.v);
-      wrap.append(btn);
-    });
+    tr.innerHTML = html;
+    body.appendChild(tr);
+  });
 
-    tdRate.append(wrap);
-    tr.append(tdRate);
-    body.append(tr);
+  // bind clicks
+  body.querySelectorAll(".star-btn").forEach(btn => {
+    btn.onclick = () => toggleStar(btn);
   });
 }
 
-async function saveRating(student, value) {
-  const key = student.id;
-  const old = assessments[key];
-  // Bấm lại mức đang chọn → bỏ chọn (xóa đánh giá)
-  const isClear = old === value;
-  const newValue = isClear ? "" : value;
+async function toggleStar(btn) {
+  const studentId = btn.dataset.sid;
+  const slot = Number(btn.dataset.slot);
+  const type = btn.dataset.type;
+  const semester = $("semesterSelect").value;
+  const subjectId = $("subjectSelect").value;
+  const classId = $("classSelect").value;
 
-  if (isClear) delete assessments[key];
-  else assessments[key] = newValue;
-  renderStudents();
-  $("saveStatus").textContent = isClear
-    ? `Đang xóa đánh giá ${student.name}...`
-    : `Đang lưu ${student.name}...`;
+  const current = (assessments[studentId] || {})[String(slot)];
+  // Nếu đang bật đúng loại này → xóa; ngược lại → set loại mới
+  const newType = current === type ? "" : type;
 
+  btn.disabled = true;
   try {
     await api("saveAssessment", {
-      studentId: key,
-      classId: $("classSelect").value,
-      weekId: $("weekSelect").value,
-      subjectId: $("subjectSelect").value,
-      value: isClear ? "CLEAR" : newValue
+      studentId,
+      classId,
+      subjectId,
+      semester,
+      slot,
+      type: newType || "CLEAR"
     });
-    $("saveStatus").textContent = isClear
-      ? `Đã xóa đánh giá: ${student.name}`
-      : `Đã lưu: ${student.name} · ${rating.find(x => x.v === newValue).t}`;
+
+    if (!assessments[studentId]) assessments[studentId] = {};
+    if (newType) {
+      assessments[studentId][String(slot)] = newType;
+    } else {
+      delete assessments[studentId][String(slot)];
+    }
+
+    // Re-render row to update hide logic
+    renderEvalBody();
+    $("saveStatus").textContent = newType
+      ? `Đã lưu: ${type} lần ${slot}`
+      : `Đã xóa đánh giá lần ${slot}`;
+    setTimeout(() => ($("saveStatus").textContent = ""), 2000);
   } catch (e) {
-    if (isClear) assessments[key] = old;
-    else assessments[key] = old;
-    renderStudents();
-    $("saveStatus").textContent = "Lỗi: " + e.message;
+    toast(e.message);
+  } finally {
+    btn.disabled = false;
   }
 }
 
-// ==================== THỐNG KÊ ====================
-// Top 1-10 (lớp hoặc học sinh tùy chọn)
+// ==================== PRINT ====================
+$("printBtn").onclick = async () => {
+  const classId = $("classSelect").value;
+  const semester = $("semesterSelect").value;
+  const ps = $("printSubjects");
+  const subjectIds = [...ps.selectedOptions].map(o => o.value);
+
+  if (!classId) {
+    toast("Vui lòng chọn lớp trước");
+    return;
+  }
+  if (!subjectIds.length) {
+    // nếu không chọn môn in thì dùng môn đang đánh giá
+    const cur = $("subjectSelect").value;
+    if (cur) subjectIds.push(cur);
+    else {
+      toast("Chọn ít nhất 1 môn để in");
+      return;
+    }
+  }
+
+  try {
+    $("printBtn").disabled = true;
+    $("printBtn").textContent = "Đang tải...";
+    const data = await api("printData", { classId, subjectIds, semester });
+    openPrintWindow(data);
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    $("printBtn").disabled = false;
+    $("printBtn").textContent = "🖨 In biểu mẫu";
+  }
+};
+
+function openPrintWindow(data) {
+  const { className, semester, students, subjects, configs, assessments } = data;
+  const slotCount = currentSlotCount;
+
+  // build config map subjectId_slot → content
+  const confMap = {};
+  (configs || []).forEach(c => {
+    confMap[`${c.subjectId}_${c.slot}`] = c.content;
+  });
+
+  let html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
+    <title>Phiếu đánh giá – ${escapeHtml(className)} – HK${semester}</title>
+    <style>
+      body { font-family: "Times New Roman", serif; font-size: 12px; margin: 16px; }
+      h2, h3 { text-align: center; margin: 6px 0; }
+      table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
+      th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
+      th { background: #f0f0f0; }
+      .name { text-align: left; min-width: 140px; }
+      .star { color: #ca8a04; font-size: 14px; }
+      .muted { color: #999; }
+      @media print { .no-print { display: none; } }
+    </style></head><body>
+    <div class="no-print" style="margin-bottom:12px">
+      <button onclick="window.print()">In ngay</button>
+      <button onclick="window.close()">Đóng</button>
+    </div>
+    <h2>BẢNG ĐÁNH GIÁ HỌC TẬP</h2>
+    <h3>Lớp: ${escapeHtml(className)} &nbsp;|&nbsp; Học kỳ: ${semester}</h3>`;
+
+  subjects.forEach(sub => {
+    html += `<h3 style="margin-top:20px">Môn: ${escapeHtml(sub.name)}</h3>
+      <table><thead><tr>
+        <th>STT</th><th class="name">Họ và tên</th><th>Mã HS</th>`;
+    for (let i = 1; i <= slotCount; i++) {
+      const label = confMap[`${sub.id}_${i}`] || `Lần ${i}`;
+      html += `<th colspan="2">${escapeHtml(label)}<br><small>HTT / HT</small></th>`;
+    }
+    html += `</tr></thead><tbody>`;
+
+    students.forEach((s, idx) => {
+      html += `<tr>
+        <td>${idx + 1}</td>
+        <td class="name">${escapeHtml(s.name)}</td>
+        <td>${escapeHtml(s.code || "")}</td>`;
+      for (let slot = 1; slot <= slotCount; slot++) {
+        const key = `${s.id}_${sub.id}_${slot}`;
+        const t = assessments[key] || "";
+        const htt = t === "HTT" ? '<span class="star">★</span>' : '<span class="muted">☆</span>';
+        const ht = t === "HT" ? '<span class="star">★</span>' : (t === "HTT" ? '—' : '<span class="muted">☆</span>');
+        html += `<td>${htt}</td><td>${ht}</td>`;
+      }
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+  });
+
+  html += `</body></html>`;
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+}
+
+// ==================== STATS ====================
 $("loadClassRank").onclick = async () => {
   try {
-    const classId = $("statsClassFilter").value;
     const r = await api("stats", {
-      weekId: $("statsWeek").value,
+      mode: "class",
+      semester: $("statsSemester").value,
       subjectId: $("statsSubject").value,
-      classId,
-      semester: $("statsSemester") ? $("statsSemester").value : ""
+      classId: $("statsClassFilter").value
     });
-
-    $("classRankSummary").innerHTML = "";
-    [
-      ["Tốt", r.total.good],
-      ["Hoàn thành", r.total.complete],
-      ["Cần cố gắng", r.total.notYet],
-      ["Đã đánh giá", r.total.assessed]
-    ].forEach(([label, val]) => {
+    const sum = $("classRankSummary");
+    sum.innerHTML = "";
+    [["HTT", r.total?.good || 0], ["HT", r.total?.complete || 0], ["Tổng", r.total?.total || 0]].forEach(([label, val]) => {
       const d = document.createElement("div");
-      d.className = "stat";
+      d.className = "stat-card";
       d.innerHTML = `<b>${val}</b><span>${label}</span>`;
-      $("classRankSummary").append(d);
+      sum.appendChild(d);
     });
 
     const body = $("rankBody");
     body.innerHTML = "";
-
-    // Cập nhật tiêu đề cột theo mode
-    const thead = body.closest("table").querySelector("thead tr");
-    if (r.mode === "student") {
-      thead.innerHTML = `
-        <th>Hạng</th>
-        <th>Học sinh</th>
-        <th>Mã HS</th>
-        <th>Tốt</th>
-        <th>Hoàn thành</th>
-        <th>Cần cố gắng</th>
-        <th>Tỷ lệ Tốt</th>`;
-      (r.ranking || []).slice(0, 10).forEach((x, i) => {
-        const tr = document.createElement("tr");
-        [i + 1, x.studentName, x.studentCode || "", x.good, x.complete, x.notYet, x.goodRate + "%"]
-          .forEach(v => {
-            const td = document.createElement("td");
-            td.textContent = v;
-            tr.append(td);
-          });
-        body.append(tr);
-      });
-    } else {
-      thead.innerHTML = `
-        <th>Hạng</th>
-        <th>Lớp</th>
-        <th>Tốt</th>
-        <th>Hoàn thành</th>
-        <th>Cần cố gắng</th>
-        <th>Tỷ lệ Tốt</th>`;
-      (r.ranking || []).slice(0, 10).forEach((x, i) => {
-        const tr = document.createElement("tr");
-        [i + 1, x.className, x.good, x.complete, x.notYet, x.goodRate + "%"]
-          .forEach(v => {
-            const td = document.createElement("td");
-            td.textContent = v;
-            tr.append(td);
-          });
-        body.append(tr);
-      });
+    (r.ranking || []).forEach((item, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${escapeHtml(item.className)}</td>
+        <td>${item.good}</td>
+        <td>${item.complete}</td>
+        <td>${item.total}</td>
+        <td>${item.goodRate}%</td>`;
+      body.appendChild(tr);
+    });
+    if (!(r.ranking || []).length) {
+      body.innerHTML = `<tr><td colspan="6" class="empty">Chưa có dữ liệu</td></tr>`;
     }
   } catch (e) {
     toast(e.message);
   }
 };
 
-// Thống kê học sinh – dùng ô nhập tên, không dùng select
 $("loadStudentStats").onclick = async () => {
   const classId = $("statsClass").value;
-  const nameQuery = ($("statsStudentName").value || "").trim().toLocaleLowerCase("vi");
-  const semester = $("statsStudentSemester") ? $("statsStudentSemester").value : "";
-  const subjectId = $("statsStudentSubject") ? $("statsStudentSubject").value : "";
-
-  if (!classId) return toast("Vui lòng chọn lớp");
-
-  $("studentListBox").style.display = "none";
-  $("studentStatsInfo").style.display = "none";
-
+  if (!classId) {
+    toast("Chọn lớp trước");
+    return;
+  }
   try {
-    // Lấy danh sách + % Tốt theo bộ lọc
-    const r = await api("classStudentStats", {
+    const r = await api("stats", {
+      mode: "student",
       classId,
-      semester,
-      subjectId
+      semester: $("statsStudentSemester").value,
+      subjectId: $("statsStudentSubject").value,
+      name: $("statsStudentName").value.trim()
     });
-    let list = r.students || [];
 
-    if (nameQuery) {
-      list = list.filter(s => s.name.toLocaleLowerCase("vi").includes(nameQuery));
+    $("studentListBox").style.display = "none";
+    $("studentStatsInfo").style.display = "none";
+
+    if (r.mode === "student-list") {
+      $("studentListBox").style.display = "block";
+      const tbody = $("statsStudentList");
+      tbody.innerHTML = "";
+      (r.list || []).forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(item.student.name)}</td>
+          <td>${escapeHtml(item.student.code || "")}</td>
+          <td>${item.good}</td>
+          <td>${item.complete}</td>
+          <td>${item.total}</td>
+          <td>${item.goodRate}%</td>`;
+        tbody.appendChild(tr);
+      });
+      if (!(r.list || []).length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty">Không tìm thấy học sinh</td></tr>`;
+      }
+    } else if (r.mode === "student-detail") {
+      $("studentStatsInfo").style.display = "block";
+      const item = (r.list || [])[0];
+      if (!item) return;
+      $("statsStudentNameTitle").textContent = `${item.student.name} (${item.student.code || ""})`;
+
+      const sum = $("statsSummary");
+      sum.innerHTML = "";
+      [["HTT", item.summary.good], ["HT", item.summary.complete], ["Tổng", item.summary.total]].forEach(([label, val]) => {
+        const d = document.createElement("div");
+        d.className = "stat-card";
+        d.innerHTML = `<b>${val}</b><span>${label}</span>`;
+        sum.appendChild(d);
+      });
+
+      const body = $("statsDetailBody");
+      body.innerHTML = "";
+      const subMap = {};
+      (meta.subjects || []).forEach(s => subMap[s.id] = s.name);
+
+      (item.detail || []).sort((a, b) => a.semester - b.semester || a.slot - b.slot).forEach(d => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>HK${d.semester}</td>
+          <td>Lần ${d.slot}</td>
+          <td>${escapeHtml(subMap[d.subjectId] || d.subjectId)}</td>
+          <td>${d.type === "HTT" ? "★ Hoàn thành tốt" : "☆ Hoàn thành"}</td>
+          <td>${d.updatedAt ? new Date(d.updatedAt).toLocaleString("vi") : ""}</td>`;
+        body.appendChild(tr);
+      });
+      if (!(item.detail || []).length) {
+        body.innerHTML = `<tr><td colspan="5" class="empty">Chưa có dữ liệu đánh giá</td></tr>`;
+      }
     }
-
-    // Nếu chỉ còn đúng 1 học sinh → hiện chi tiết luôn
-    if (list.length === 1) {
-      await showStudentDetail(list[0].id, list[0]);
-      return;
-    }
-
-    // Hiện danh sách kèm % Tốt
-    $("studentListBox").style.display = "block";
-    const tbody = $("statsStudentList");
-    tbody.innerHTML = "";
-
-    if (!list.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty">Không tìm thấy học sinh</td></tr>`;
-      return;
-    }
-
-    list.forEach(s => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><strong>${s.name}</strong></td>
-        <td style="color:#64748b">${s.code || ""}</td>
-        <td>${s.good || 0}</td>
-        <td>${s.complete || 0}</td>
-        <td>${s.needImprove || 0}</td>
-        <td><strong>${s.goodRate || 0}%</strong></td>
-        <td><button class="ghost small">Xem chi tiết</button></td>
-      `;
-      tr.querySelector("button").onclick = () => showStudentDetail(s.id, s);
-      tbody.append(tr);
-    });
   } catch (e) {
     toast(e.message);
   }
 };
 
-function getWeekNumber(weekName) {
-  const m = String(weekName || "").match(/(\d+)/);
-  return m ? parseInt(m[1], 10) : 0;
-}
-
-function filterBySemester(detail, semester) {
-  if (semester === "1") return detail.filter(d => {
-    const n = getWeekNumber(d.weekName);
-    return n >= 1 && n <= 18;
-  });
-  if (semester === "2") return detail.filter(d => {
-    const n = getWeekNumber(d.weekName);
-    return n >= 19 && n <= 35;
-  });
-  return detail;
-}
-
-async function showStudentDetail(studentId, studentInfo) {
-  try {
-    const semester = $("statsStudentSemester") ? $("statsStudentSemester").value : "";
-    const r = await api("studentStats", {
-      studentId,
-      semester
-    });
-
-    // Lọc theo môn nếu có
-    const subjectFilter = $("statsStudentSubject").value;
-    let detail = r.detail || [];
-    if (subjectFilter) {
-      const subName = meta.subjects.find(s => s.id === subjectFilter)?.name;
-      detail = detail.filter(d => d.subjectName === subName);
-    }
-    // Lọc lại theo học kỳ ở client (đảm bảo không lẫn tuần HK khác)
-    detail = filterBySemester(detail, semester);
-
-    $("studentListBox").style.display = "none";
-    $("studentStatsInfo").style.display = "block";
-
-    $("statsStudentNameTitle").textContent =
-      `${r.student.name}${r.student.code ? " (" + r.student.code + ")" : ""}`;
-
-    const summary = {
-      good: detail.filter(x => x.value === "TOT").length,
-      complete: detail.filter(x => x.value === "HT").length,
-      needImprove: detail.filter(x => x.value === "CĐ").length,
-      total: detail.length
-    };
-
-    $("statsSummary").innerHTML = "";
-    [
-      ["Tốt", summary.good],
-      ["Hoàn thành", summary.complete],
-      ["Cần cố gắng", summary.needImprove],
-      ["Tổng số lần", summary.total]
-    ].forEach(([label, val]) => {
-      const d = document.createElement("div");
-      d.className = "stat";
-      d.innerHTML = `<b>${val}</b><span>${label}</span>`;
-      $("statsSummary").append(d);
-    });
-
-    const body = $("statsDetailBody");
-    body.innerHTML = "";
-
-    if (!detail.length) {
-      body.innerHTML = `<tr><td colspan="5" class="empty">Chưa có dữ liệu đánh giá</td></tr>`;
-      return;
-    }
-
-    const map = { TOT: "★ Tốt", HT: "✿ Hoàn thành", CĐ: "ϟ Cần cố gắng" };
-
-    detail.forEach(item => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${item.weekName}</td>
-        <td>${item.subjectName}</td>
-        <td>${map[item.value] || item.value}</td>
-        <td>${item.updatedAt ? new Date(item.updatedAt).toLocaleString("vi") : ""}</td>
-        <td><button class="ghost small edit-eval">Sửa</button></td>
-      `;
-      tr.querySelector(".edit-eval").onclick = () => {
-        const choice = prompt("Chọn mức mới:\n1 = Tốt\n2 = Hoàn thành\n3 = Cần cố gắng",
-          item.value === "TOT" ? "1" : item.value === "HT" ? "2" : "3");
-        if (!choice) return;
-        const valMap = { "1": "TOT", "2": "HT", "3": "CĐ" };
-        const v = valMap[choice.trim()];
-        if (!v) return toast("Giá trị không hợp lệ");
-
-        const week = meta.weeks.find(w => w.name === item.weekName);
-        const subject = meta.subjects.find(s => s.name === item.subjectName);
-        if (!week || !subject) return toast("Không tìm thấy tuần/môn");
-
-        api("saveAssessment", {
-          studentId,
-          classId: $("statsClass").value,
-          weekId: week.id,
-          subjectId: subject.id,
-          value: v
-        }).then(() => {
-          toast("Đã cập nhật");
-          showStudentDetail(studentId, studentInfo);
-        }).catch(e => toast(e.message));
-      };
-      body.append(tr);
-    });
-  } catch (e) {
-    toast(e.message);
-  }
-}
-
-// ==================== QUẢN LÝ ====================
-function setLoading(btn, loading, text = "Đang xử lý...") {
-  if (!btn) return;
-  btn.disabled = loading;
-  btn.dataset.old = btn.dataset.old || btn.textContent;
-  btn.textContent = loading ? text : btn.dataset.old;
-}
-
-function bindAddForm(formId, action) {
-  const form = $(formId);
-  form.onsubmit = async e => {
-    e.preventDefault();
-    const btn = form.querySelector("button");
-    setLoading(btn, true, "Đang thêm...");
-    try {
-      const name = new FormData(form).get("name").trim();
-      await api(action, { name });
-      await refreshMeta();
-      renderManageTables();
-      $("manageMsg").textContent = "Đã thêm thành công";
-      form.reset();
-    } catch (err) {
-      $("manageMsg").textContent = err.message;
-    } finally {
-      setLoading(btn, false);
-    }
-  };
-}
-bindAddForm("classForm", "addClass");
-bindAddForm("subjectForm", "addSubject");
-bindAddForm("weekForm", "addWeek");
-
-async function refreshMeta() {
-  const r = await api("init");
-  meta = r.meta;
-  fillSelects();
-}
-
-function renderManageTables() {
-  renderTableList("classList", meta.classes, "updateClass", "deleteClass");
-  renderTableList("subjectList", meta.subjects, "updateSubject", "deleteSubject");
-  renderTableList("weekList", meta.weeks, "updateWeek", "deleteWeek");
-}
-
-function renderTableList(tbodyId, items, updateAction, deleteAction) {
-  const tbody = $(tbodyId);
-  if (!tbody) return;
-  tbody.innerHTML = "";
-  if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="2" class="empty">Chưa có dữ liệu</td></tr>`;
+// ==================== CONFIG NỘI DUNG ĐÁNH GIÁ ====================
+function loadConfigSlots() {
+  const subjectId = $("configSubject").value;
+  const box = $("configSlots");
+  if (!subjectId) {
+    box.innerHTML = `<p class="hint">Chọn môn học để cấu hình</p>`;
     return;
   }
-  items.forEach(item => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${item.name}</td>
-      <td class="actions">
-        <button class="ghost small edit">Sửa</button>
-        <button class="ghost small danger del">Xóa</button>
-      </td>
-    `;
-    tr.querySelector(".edit").onclick = async () => {
-      const newName = prompt("Tên mới:", item.name);
-      if (!newName || newName.trim() === item.name) return;
-      try {
-        await api(updateAction, { id: item.id, name: newName.trim() });
-        await refreshMeta();
-        renderManageTables();
-        toast("Đã cập nhật");
-      } catch (e) { toast(e.message); }
-    };
-    tr.querySelector(".del").onclick = async () => {
-      if (!confirm(`Xóa "${item.name}"?`)) return;
-      try {
-        await api(deleteAction, { id: item.id });
-        await refreshMeta();
-        renderManageTables();
-        toast("Đã xóa");
-      } catch (e) { toast(e.message); }
-    };
-    tbody.append(tr);
-  });
+
+  // Lấy config hiện có từ meta
+  const existing = (meta.evalConfig || []).filter(c => c.subjectId === subjectId);
+  const map = {};
+  existing.forEach(c => map[c.slot] = c.content);
+
+  let html = `<div class="config-grid">`;
+  for (let i = 1; i <= 6; i++) {
+    html += `
+      <label>Lần ${i}
+        <input type="text" data-slot="${i}" value="${escapeHtml(map[i] || "")}" placeholder="Ví dụ: Kiểm tra miệng / Bài tập...">
+      </label>`;
+  }
+  html += `</div>`;
+  box.innerHTML = html;
 }
 
-if ($("manageStudentClass")) $("manageStudentClass").onchange = loadStudentManageList;
+$("loadConfigBtn").onclick = () => loadConfigSlots();
 
-async function loadStudentManageList() {
+$("configSubject").onchange = () => loadConfigSlots();
+
+$("saveConfigBtn").onclick = async () => {
+  const subjectId = $("configSubject").value;
+  if (!subjectId) {
+    toast("Chọn môn học trước");
+    return;
+  }
+  const slots = [];
+  $("configSlots").querySelectorAll("input[data-slot]").forEach(inp => {
+    slots.push({ slot: Number(inp.dataset.slot), content: inp.value.trim() });
+  });
+  try {
+    await api("saveEvalConfig", { subjectId, slots });
+    // refresh meta
+    const r = await api("init");
+    meta = r.meta;
+    $("configMsg").textContent = "Đã lưu cấu hình nội dung đánh giá.";
+    $("configMsg").style.color = "#15803d";
+    setTimeout(() => ($("configMsg").textContent = ""), 2500);
+  } catch (e) {
+    $("configMsg").textContent = e.message;
+    $("configMsg").style.color = "#b91c1c";
+  }
+};
+
+// ==================== MANAGE ====================
+function refreshManageLists() {
+  // classes
+  const cl = $("classList");
+  cl.innerHTML = "";
+  (meta.classes || []).forEach(c => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${escapeHtml(c.name)}</td>
+      <td><button class="ghost danger-btn" data-id="${c.id}" data-type="class">Xóa</button></td>`;
+    cl.appendChild(tr);
+  });
+  cl.querySelectorAll("button").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm("Xóa lớp này?")) return;
+      try {
+        await api("deleteClass", { id: btn.dataset.id });
+        const r = await api("init");
+        meta = r.meta;
+        fillSelects();
+        refreshManageLists();
+        toast("Đã xóa lớp");
+      } catch (e) { toast(e.message); }
+    };
+  });
+
+  // subjects
+  const sl = $("subjectList");
+  sl.innerHTML = "";
+  (meta.subjects || []).forEach(s => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${escapeHtml(s.name)}</td>
+      <td><button class="ghost danger-btn" data-id="${s.id}" data-type="subject">Xóa</button></td>`;
+    sl.appendChild(tr);
+  });
+  sl.querySelectorAll("button").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm("Xóa môn này?")) return;
+      try {
+        await api("deleteSubject", { id: btn.dataset.id });
+        const r = await api("init");
+        meta = r.meta;
+        fillSelects();
+        refreshManageLists();
+        toast("Đã xóa môn");
+      } catch (e) { toast(e.message); }
+    };
+  });
+
+  // students of selected class
+  loadManageStudents();
+}
+
+$("manageStudentClass").onchange = () => loadManageStudents();
+
+async function loadManageStudents() {
   const classId = $("manageStudentClass").value;
   const tbody = $("studentManageList");
   if (!classId) {
-    tbody.innerHTML = `<tr><td colspan="3" class="empty">Chọn lớp để xem danh sách</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="empty">Chọn lớp</td></tr>`;
     return;
   }
   try {
     const r = await api("students", { classId });
-    const list = r.students || [];
     tbody.innerHTML = "";
-    if (!list.length) {
-      tbody.innerHTML = `<tr><td colspan="3" class="empty">Lớp chưa có học sinh</td></tr>`;
-      return;
-    }
-    list.forEach(s => {
+    (r.students || []).forEach(s => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${s.name}</td>
-        <td>${s.code || ""}</td>
-        <td class="actions">
-          <button class="ghost small edit">Sửa</button>
-          <button class="ghost small danger del">Xóa</button>
-        </td>
-      `;
-      tr.querySelector(".edit").onclick = async () => {
-        const name = prompt("Họ tên mới:", s.name);
-        if (!name) return;
-        const code = prompt("Mã học sinh:", s.code || "");
+        <td>${escapeHtml(s.name)}</td>
+        <td>${escapeHtml(s.code || "")}</td>
+        <td><button class="ghost danger-btn" data-id="${s.id}">Xóa</button></td>`;
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll("button").forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm("Xóa học sinh này?")) return;
         try {
-          await api("updateStudent", { id: s.id, name: name.trim(), code: (code || "").trim() });
-          loadStudentManageList();
-          toast("Đã cập nhật");
+          await api("deleteStudent", { id: btn.dataset.id });
+          loadManageStudents();
+          toast("Đã xóa học sinh");
         } catch (e) { toast(e.message); }
       };
-      tr.querySelector(".del").onclick = async () => {
-        if (!confirm(`Xóa học sinh "${s.name}"?`)) return;
-        try {
-          await api("deleteStudent", { id: s.id });
-          loadStudentManageList();
-          toast("Đã xóa");
-        } catch (e) { toast(e.message); }
-      };
-      tbody.append(tr);
     });
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="3" class="empty">${e.message}</td></tr>`;
   }
 }
 
-// Nạp Excel
-function cellText(v) {
-  if (v == null) return "";
-  if (typeof v === "number" && Number.isFinite(v)) return Number.isInteger(v) ? String(v) : String(v).trim();
-  return String(v).replace(/\s+/g, " ").trim();
-}
-function parseCsv(text) {
-  const out = []; let row = [], value = "", quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"' && quoted && text[i+1] === '"') { value += '"'; i++; }
-    else if (c === '"') quoted = !quoted;
-    else if ((c === ',' || c === ';' || c === '\t') && !quoted) { row.push(value); value = ""; }
-    else if ((c === '\n' || c === '\r') && !quoted) {
-      if (c === '\r' && text[i+1] === '\n') i++;
-      row.push(value);
-      if (row.some(x => String(x).trim())) out.push(row);
-      row = []; value = "";
-    } else value += c;
-  }
-  row.push(value);
-  if (row.some(x => String(x).trim())) out.push(row);
-  return out;
-}
-function parseStudentRows(rows) {
-  const norm = x => cellText(x).toLocaleLowerCase("vi").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d");
-  const header = rows.findIndex(r => {
-    const cells = r.map(norm);
-    return cells.some(x => /^(ho va ten|ho ten)$/.test(x)) && cells.some(x => /^(ma hoc sinh|ma hs)$/.test(x));
-  });
-  if (header < 0) throw Error("Không nhận diện được tiêu đề (cần cột Mã học sinh và Họ và tên)");
-  const h = rows[header].map(norm);
-  const nameCol = h.findIndex(x => /^(ho va ten|ho ten)$/.test(x));
-  const codeCol = h.findIndex(x => /^(ma hoc sinh|ma hs)$/.test(x));
-  const nextH = norm(rows[header][nameCol+1] || "");
-  const nameNext = (nameCol >= 0 && (!nextH || nextH === "ten")) ? nameCol + 1 : -1;
-  const data = [];
-  for (const r of rows.slice(header+1)) {
-    const first = cellText(r[nameCol]);
-    const last = nameNext >= 0 ? cellText(r[nameNext]) : "";
-    const name = [first, last].filter(Boolean).join(" ").trim();
-    if (!name) continue;
-    data.push({ name, code: cellText(r[codeCol]) });
-  }
-  if (!data.length) throw Error("Không có dòng học sinh hợp lệ");
-  return data;
-}
+$("classForm").onsubmit = async e => {
+  e.preventDefault();
+  const name = e.target.name.value.trim();
+  try {
+    await api("addClass", { name });
+    e.target.reset();
+    const r = await api("init");
+    meta = r.meta;
+    fillSelects();
+    refreshManageLists();
+    toast("Đã thêm lớp");
+  } catch (err) { toast(err.message); }
+};
+
+$("subjectForm").onsubmit = async e => {
+  e.preventDefault();
+  const name = e.target.name.value.trim();
+  try {
+    await api("addSubject", { name });
+    e.target.reset();
+    const r = await api("init");
+    meta = r.meta;
+    fillSelects();
+    refreshManageLists();
+    toast("Đã thêm môn");
+  } catch (err) { toast(err.message); }
+};
 
 $("uploadForm").onsubmit = async e => {
   e.preventDefault();
-  const file = $("studentFile").files[0];
   const classId = $("uploadClass").value;
-  if (!file || !classId) return $("manageMsg").textContent = "Chọn lớp và file";
-  const btn = $("uploadForm").querySelector("button");
-  setLoading(btn, true, "Đang nạp...");
+  const file = $("studentFile").files[0];
+  if (!file) return;
   try {
-    let rows;
-    if (file.name.toLowerCase().endsWith(".csv")) {
-      rows = parseCsv(await file.text());
-    } else {
-      if (!window.XLSX) throw Error("Thiếu thư viện Excel");
-      const wb = XLSX.read(await file.arrayBuffer(), { type: "array", raw: false, cellText: true });
-      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false });
-    }
-    const data = parseStudentRows(rows);
-    const out = await api("importStudents", {
-      classId,
-      students: data.map(x => ({ name: x.name, code: x.code }))
-    });
-    $("manageMsg").textContent = `Đọc ${data.length} học sinh, đã thêm ${out.count}`;
-    toast("Nạp thành công");
-    loadStudentManageList();
+    const list = await parseStudentFile(file);
+    const r = await api("importStudents", { classId, students: list });
+    toast(`Đã nạp ${r.count} học sinh`);
+    e.target.reset();
+    loadManageStudents();
   } catch (err) {
-    $("manageMsg").textContent = err.message;
-  } finally {
-    setLoading(btn, false);
+    toast(err.message);
   }
 };
 
+async function parseStudentFile(file) {
+  const data = await file.arrayBuffer();
+  const wb = XLSX.read(data);
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  const list = [];
+  rows.forEach((row, i) => {
+    if (i === 0) return; // skip header
+    const name = String(row[1] || row[0] || "").trim();
+    const code = String(row[2] || row[0] || "").trim();
+    if (name && name.length > 1) list.push({ name, code });
+  });
+  return list;
+}
 
-// ==================== XÓA DỮ LIỆU ĐÁNH GIÁ ====================
-async function clearAssessmentsData() {
-  const classId = $("clearClass")?.value || "";
-  const semester = $("clearSemester")?.value || "";
-  const subjectId = $("clearSubject")?.value || "";
-
-  let msg = "Bạn có chắc muốn XÓA dữ liệu đánh giá";
-  if (classId) {
-    const c = meta.classes.find(x => x.id === classId);
-    msg += ` của lớp ${c ? c.name : ""}`;
-  }
-  if (semester === "1") msg += " – Học kỳ 1 (Tuần 1-18)";
-  else if (semester === "2") msg += " – Học kỳ 2 (Tuần 19-35)";
-  if (subjectId) {
-    const s = meta.subjects.find(x => x.id === subjectId);
-    msg += ` – môn ${s ? s.name : ""}`;
-  }
-  msg += "?\n\nHành động này KHÔNG thể hoàn tác!";
-
-  if (!confirm(msg)) return;
-
-  const btn = $("btnClearAssessments");
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Đang xóa...";
-  }
+$("clearAssessmentsBtn").onclick = async () => {
+  if (!confirm("Bạn chắc chắn muốn xóa dữ liệu đánh giá? Hành động không thể hoàn tác.")) return;
   try {
-    const r = await api("clearAssessments", { classId, semester, subjectId });
-    toast(`Đã xóa ${r.deleted} bản ghi đánh giá`);
-    $("manageMsg").textContent = `Đã xóa ${r.deleted} bản ghi đánh giá`;
+    const r = await api("clearAssessments", {
+      classId: $("clearClass").value,
+      semester: $("clearSemester").value,
+      subjectId: $("clearSubject").value
+    });
+    toast(`Đã xóa ${r.deleted} bản ghi`);
   } catch (e) {
     toast(e.message);
-    $("manageMsg").textContent = e.message;
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Xóa dữ liệu đánh giá";
-    }
   }
-}
-if ($("btnClearAssessments")) {
-  $("btnClearAssessments").onclick = clearAssessmentsData;
+};
+
+// ==================== UTILS ====================
+function escapeHtml(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-// ==================== AUTO LOGIN ====================
+// Auto login
 (async () => {
-  const t = localStorage.getItem("dgt_token");
-  if (t) {
-    token = t;
+  const saved = localStorage.getItem("dgt_token");
+  if (saved) {
+    token = saved;
     try {
       const r = await api("me");
       me = r.user;
       await enter();
     } catch {
       localStorage.removeItem("dgt_token");
+      token = "";
     }
   }
 })();
