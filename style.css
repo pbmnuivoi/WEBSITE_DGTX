@@ -624,3 +624,8 @@ header small { display: block; color: var(--muted); font-size: 12px; }
 #rankBody tr.rank-top-1 td:first-child { color: #9a6700; font-size: 18px; }
 #rankBody tr.rank-top-2 td:first-child { color: #526171; font-size: 17px; }
 #rankBody tr.rank-top-3 td:first-child { color: #9a5728; font-size: 17px; }
+
+/* Biểu tượng HT là hoa; kích thước nút cố định để không làm xô cột */
+.star-btn.ht { font-size: 20px; }
+.star-btn.ht.on { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.star-btn.htt { font-size: 22px; }
