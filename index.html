@@ -260,9 +260,13 @@
 
       <div class="section-title">Quản lý học sinh theo lớp</div>
       <div class="card">
-        <label style="max-width:280px;margin-bottom:12px">Chọn lớp
-          <select id="manageStudentClass"></select>
-        </label>
+        <div class="toolbar" style="align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
+          <label style="max-width:280px">Chọn lớp
+            <select id="manageStudentClass"></select>
+          </label>
+          <button id="clearClassStudentsBtn" class="danger">Xóa danh sách học sinh lớp</button>
+          <button id="clearAllStudentsBtn" class="danger">Xóa tất cả học sinh</button>
+        </div>
         <div class="table-wrap" style="padding:0">
           <table>
             <thead>
