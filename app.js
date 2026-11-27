@@ -374,10 +374,6 @@ function openPrintWindow(data) {
   const yearLabel = "NĂM HỌC 2026 - 2027";
   const hkLabel = semester ? `Học kỳ ${semester}` : "Cả năm";
 
-  // Max stars = subjects * 6 * 2 (HTT + HT) but we count only filled stars
-  // In sample: "SỐ SAO đạt / tối đa" e.g. 8/36 — 36 = 3 subjects * 12
-  const maxStars = (subjects.length || 1) * slotCount * 2;
-
   let html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
 <title>Bảng tổng hợp đánh giá – ${escapeHtml(className)}</title>
 <style>
@@ -389,16 +385,11 @@ function openPrintWindow(data) {
   th, td { border: 1px solid #222; padding: 3px 2px; text-align: center; vertical-align: middle; }
   th { background: #f5f5f5; font-size: 10px; }
   .name { text-align: left; padding-left: 6px; white-space: nowrap; min-width: 120px; }
-  .sub-htt { background: #fff8e1; }
-  .sub-ht { background: #e8f5e9; }
-  .c0-htt { background: #fff3cd; } /* vàng nhạt - HTT */
-  .c0-ht  { background: #ffeeba; }
-  .c1-htt { background: #d4edda; } /* xanh lá - HTT */
-  .c1-ht  { background: #c3e6cb; }
-  .c2-htt { background: #d1ecf1; } /* xanh dương - HTT */
-  .c2-ht  { background: #bee5eb; }
-  .c3-htt { background: #f8d7da; }
-  .c3-ht  { background: #f5c6cb; }
+  /* Chỉ tô màu hàng tiêu đề tên môn để phân biệt các môn */
+  .subject-band-0 { background: #fff1c2; }
+  .subject-band-1 { background: #dff3e4; }
+  .subject-band-2 { background: #dcecff; }
+  .subject-band-3 { background: #fbe1e5; }
   .star { font-size: 13px; color: #000; }
   .num { font-weight: 600; white-space: nowrap; }
   .footer { margin-top: 18px; display: flex; justify-content: space-between; font-size: 11px; }
@@ -420,41 +411,36 @@ function openPrintWindow(data) {
 <tr>
   <th rowspan="3">STT</th>
   <th rowspan="3" class="name">HỌ VÀ TÊN HỌC SINH</th>
-  <th rowspan="3">SỐ SAO<br>đạt / tối đa</th>`;
+`;
 
-  // Subject group headers — màu theo từng môn (giống mẫu)
+  // Chỉ tô màu hàng tên môn; các cột đánh giá giữ nền trắng
   subjects.forEach((sub, si) => {
     const c = si % 4;
-    html += `<th colspan="12" class="c${c}-htt">${escapeHtml(sub.name)}</th>`;
+    html += `<th colspan="12" class="subject-band-${c}">${escapeHtml(sub.name)}</th>`;
   });
   html += `</tr><tr>`;
   subjects.forEach((sub, si) => {
-    const c = si % 4;
-    html += `<th colspan="6" class="c${c}-htt">Đánh giá HTT</th>`;
-    html += `<th colspan="6" class="c${c}-ht">Đánh giá HT</th>`;
+    html += `<th colspan="6">Đánh giá HTT</th>`;
+    html += `<th colspan="6">Đánh giá HT</th>`;
   });
   html += `</tr><tr>`;
   subjects.forEach((sub, si) => {
-    const c = si % 4;
-    for (let i = 1; i <= 6; i++) html += `<th class="c${c}-htt">${i}</th>`;
-    for (let i = 1; i <= 6; i++) html += `<th class="c${c}-ht">${i}</th>`;
+    for (let i = 1; i <= 6; i++) html += `<th>${i}</th>`;
+    for (let i = 1; i <= 6; i++) html += `<th>${i}</th>`;
   });
   html += `</tr></thead><tbody>`;
 
   students.forEach((s, idx) => {
-    let starCount = 0;
     let cells = "";
-    subjects.forEach((sub, si) => {
-      const c = si % 4;
+    subjects.forEach((sub) => {
       // HTT 1-6
       for (let slot = 1; slot <= 6; slot++) {
         const key = `${s.id}_${sub.id}_${slot}`;
         const t = assessments[key] || "";
         if (t === "HTT") {
-          cells += `<td class="c${c}-htt"><span class="star">★</span></td>`;
-          starCount++;
+          cells += `<td><span class="star">★</span></td>`;
         } else {
-          cells += `<td class="c${c}-htt"></td>`;
+          cells += `<td></td>`;
         }
       }
       // HT 1-6
@@ -462,17 +448,15 @@ function openPrintWindow(data) {
         const key = `${s.id}_${sub.id}_${slot}`;
         const t = assessments[key] || "";
         if (t === "HT") {
-          cells += `<td class="c${c}-ht"><span class="star">★</span></td>`;
-          starCount++;
+          cells += `<td><span class="star">★</span></td>`;
         } else {
-          cells += `<td class="c${c}-ht"></td>`;
+          cells += `<td></td>`;
         }
       }
     });
     html += `<tr>
       <td>${idx + 1}</td>
       <td class="name">${escapeHtml(s.name)}</td>
-      <td class="num">${starCount}/${maxStars}</td>
       ${cells}
     </tr>`;
   });
@@ -553,6 +537,7 @@ if ($("loadClassRank")) $("loadClassRank").onclick = async () => {
     }).filter(x => x.name);
 
     normalized.sort((a, b) => b.good - a.good || b.total - a.total);
+    normalized = normalized.slice(0, 10);
 
     const body = $("rankBody");
     body.innerHTML = "";
@@ -562,8 +547,9 @@ if ($("loadClassRank")) $("loadClassRank").onclick = async () => {
     }
     normalized.forEach((item, i) => {
       const tr = document.createElement("tr");
+      tr.className = i === 0 ? "rank-top-1" : i === 1 ? "rank-top-2" : i === 2 ? "rank-top-3" : "";
       tr.innerHTML = `
-        <td>${i + 1}</td>
+        <td>${i + 1 <= 3 ? ["🥇","🥈","🥉"][i] : i + 1}</td>
         <td>${escapeHtml(item.name)}</td>
         <td>${item.good}</td>
         <td>${item.complete}</td>
@@ -752,6 +738,29 @@ function refreshManageLists() {
   // students of selected class
   loadManageStudents();
 }
+
+
+if ($("clearClassStudentsBtn")) $("clearClassStudentsBtn").onclick = async () => {
+  const classId = $("manageStudentClass")?.value;
+  if (!classId) return toast("Vui lòng chọn lớp");
+  const className = $("manageStudentClass").selectedOptions[0]?.textContent || "lớp này";
+  if (!confirm(`Xóa toàn bộ học sinh của ${className} và dữ liệu đánh giá liên quan? Hành động không thể hoàn tác.`)) return;
+  try {
+    const r = await api("clearStudents", { classId });
+    await loadManageStudents();
+    toast(`Đã xóa ${r.deletedStudents || 0} học sinh`);
+  } catch (e) { toast(e.message); }
+};
+
+if ($("clearAllStudentsBtn")) $("clearAllStudentsBtn").onclick = async () => {
+  if (!confirm("XÓA TẤT CẢ học sinh của tất cả các lớp và toàn bộ dữ liệu đánh giá liên quan? Hành động này không thể hoàn tác.")) return;
+  if (!confirm("Xác nhận lần cuối: bạn muốn xóa danh sách học sinh TOÀN HỆ THỐNG?")) return;
+  try {
+    const r = await api("clearStudents", { all: true });
+    await loadManageStudents();
+    toast(`Đã xóa ${r.deletedStudents || 0} học sinh trong toàn hệ thống`);
+  } catch (e) { toast(e.message); }
+};
 
 if ($("manageStudentClass")) $("manageStudentClass").onchange = () => loadManageStudents();
 
