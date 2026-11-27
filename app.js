@@ -239,32 +239,34 @@ function renderEvalBody() {
     const tr = document.createElement("tr");
     const as = assessments[s.id] || {};
 
-    // STT + name
+    // STT + tên (không hiện mã HS)
     let html = `<td class="center">${idx + 1}</td>
-      <td>
-        <strong>${escapeHtml(s.name)}</strong>
-        <div class="code">${escapeHtml(s.code || "")}</div>
-      </td>`;
+      <td><strong>${escapeHtml(s.name)}</strong></td>`;
 
-    // HTT stars (1..n)
+    // HTT stars — ẩn nếu đã chọn HT cùng lần
     for (let slot = 1; slot <= currentSlotCount; slot++) {
-      const active = as[String(slot)] === "HTT";
-      html += `<td class="star-cell">
-        <button class="star-btn htt ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HTT" title="Hoàn thành tốt - Lần ${slot}">
-          ${active ? "★" : "☆"}
-        </button>
-      </td>`;
-    }
-
-    // HT stars (1..n) — ẩn nếu đã chọn HTT
-    for (let slot = 1; slot <= currentSlotCount; slot++) {
-      const hasHTT = as[String(slot)] === "HTT";
-      const active = as[String(slot)] === "HT";
-      if (hasHTT) {
+      const val = as[String(slot)];
+      if (val === "HT") {
         html += `<td class="star-cell muted-cell">—</td>`;
       } else {
+        const active = val === "HTT";
         html += `<td class="star-cell">
-          <button class="star-btn ht ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HT" title="Hoàn thành - Lần ${slot}">
+          <button type="button" class="star-btn htt ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HTT" title="Hoàn thành tốt - Lần ${slot}">
+            ${active ? "★" : "☆"}
+          </button>
+        </td>`;
+      }
+    }
+
+    // HT stars — ẩn nếu đã chọn HTT cùng lần
+    for (let slot = 1; slot <= currentSlotCount; slot++) {
+      const val = as[String(slot)];
+      if (val === "HTT") {
+        html += `<td class="star-cell muted-cell">—</td>`;
+      } else {
+        const active = val === "HT";
+        html += `<td class="star-cell">
+          <button type="button" class="star-btn ht ${active ? "on" : ""}" data-sid="${s.id}" data-slot="${slot}" data-type="HT" title="Hoàn thành - Lần ${slot}">
             ${active ? "★" : "☆"}
           </button>
         </td>`;
@@ -426,9 +428,9 @@ if ($("loadClassRank")) $("loadClassRank").onclick = async () => {
   try {
     const r = await api("stats", {
       mode: "class",
-      semester: $("statsSemester").value,
-      subjectId: $("statsSubject").value,
-      classId: $("statsClassFilter").value
+      semester: $("statsSemester")?.value || "",
+      subjectId: $("statsSubject")?.value || "",
+      classId: $("statsClassFilter")?.value || ""
     });
     const sum = $("classRankSummary");
     sum.innerHTML = "";
@@ -461,7 +463,7 @@ if ($("loadClassRank")) $("loadClassRank").onclick = async () => {
 };
 
 if ($("loadStudentStats")) $("loadStudentStats").onclick = async () => {
-  const classId = $("statsClass").value;
+  const classId = $("statsClass")?.value;
   if (!classId) {
     toast("Chọn lớp trước");
     return;
@@ -470,9 +472,9 @@ if ($("loadStudentStats")) $("loadStudentStats").onclick = async () => {
     const r = await api("stats", {
       mode: "student",
       classId,
-      semester: $("statsStudentSemester").value,
-      subjectId: $("statsStudentSubject").value,
-      name: $("statsStudentName").value.trim()
+      semester: $("statsStudentSemester")?.value || "",
+      subjectId: $("statsStudentSubject")?.value || "",
+      name: ($("statsStudentName")?.value || "").trim()
     });
 
     $("studentListBox").style.display = "none";
